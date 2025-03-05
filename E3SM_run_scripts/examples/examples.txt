@@ -1,0 +1,5 @@
+Examples:
+https://portal.nersc.gov/project/e3sm/Tutorials/2024/scripts/practice-scripts.html
+
+Tutorial:
+https://acme-climate.atlassian.net/wiki/spaces/ET/pages/4097245186/Agenda+2024+E3SM+Tutorial+Workshop
