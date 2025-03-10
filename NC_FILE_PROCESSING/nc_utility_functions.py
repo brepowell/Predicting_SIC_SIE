@@ -82,16 +82,14 @@ def loadMesh(runDir, meshFileName):
 
     return latCell, lonCell
 
-def loadData(runDir, outputFileName, print=True):
+def loadData(path_to_nc_file, print_read_statement=True):
     """ Load the data from an .nc output file. """
-
-    if not os.path.isdir(runDir):
-        raise ValueError(f"Invalid directory: {runDir}")
-
-    if print:
-        print('Read Output: ', runDir, outputFileName)
-
-    return netCDF4.Dataset(runDir + outputFileName)
+    if not os.path.exists(path_to_nc_file):  # Check if file exists
+        raise FileNotFoundError(f"File not found: {path_to_nc_file}")
+    
+    if print_read_statement:
+        print('======= Read Output: ', path_to_nc_file)
+    return netCDF4.Dataset(path_to_nc_file)
 
 def loadAll(runDir, meshFileName, outputFileName):
     """ Load the mesh and data to plot. """
@@ -166,7 +164,7 @@ def getTimeArrayFromStartTime(output, length):
 #  PRINT  #
 ###########
 
-def printAllAvailableVariables(output):
+def print_all_available_nc_variables(output):
     """ See what variables you can use in this netCDF file. 
     Requires having loaded a netCDF file into an output variable. 
     This is an alternative to the ncdump command. 
