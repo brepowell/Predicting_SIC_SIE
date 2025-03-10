@@ -15,18 +15,18 @@ def main():
         runDir = args.path
         
         #TODO - MAKE THIS ITERATE THROUGH ALL FILES IN A FOLDER
-        output = loadData(runDir, fileName)
-        days = getNumberOfDays(output)
+        output = load_data(runDir, fileName)
+        days = get_number_of_days(output)
 
     elif os.path.isfile(args.path):
         runDir, fileName = os.path.split(args.path)
-        output = loadData(runDir, fileName)
-        days = getNumberOfDays(output)
+        output = load_data(runDir, fileName)
+        days = get_number_of_days(output)
     else:
         raise ValueError("Provided path is neither a valid file nor a directory.")
 
     # Get list of all days / time values to plot that exist in one .nc file
-    timeList = printDateTime(output, timeStringVariable=START_TIME_VARIABLE, days=days)
+    timeList = print_date_time(output, timeStringVariable=START_TIME_VARIABLE, days=days)
 
 if __name__ == "__main__":
     try:

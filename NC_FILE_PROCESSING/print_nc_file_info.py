@@ -12,7 +12,7 @@ def main():
     print(f"Received file path: {args.path}")  # Debug print
 
     if args.path.endswith('.nc'):
-        output = loadData(args.path, True)
+        output = load_data(args.path, True)
     else:
         raise ValueError("Provided path is not an .nc file.")
 
