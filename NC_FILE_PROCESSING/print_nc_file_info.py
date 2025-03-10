@@ -1,4 +1,4 @@
-from utility import *
+from NC_FILE_PROCESSING.nc_utility_functions import *
 
 #runDir         = os.path.dirname(os.path.abspath(__file__))       # Get current directory path
 runDir = perlmutterpath1 # For perlmutter only

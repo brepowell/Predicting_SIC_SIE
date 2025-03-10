@@ -115,7 +115,7 @@ fi
 
 # Possible Production run settings:
 # 1    YEAR: STOP_N="1"  ; REST_N="3" (MONTHS) ; RESUBMIT="0"  = 1  + 0 * 1  = 1 YEAR
-# 10  YEARS: STOP_N="10" ; REST_N="1" (YEARS)  ; RESUBMIT="0"  = 10 + 0 * 10 = 1 YEAR
+# 10  YEARS: STOP_N="10" ; REST_N="1" (YEARS)  ; RESUBMIT="0"  = 10 + 0 * 10 = 10 YEARS
 # 500 YEARS: STOP_N="50" ; REST_N="5" (YEARS)  ; RESUBMIT="9"  = 50 + 9 * 50 = 500 YEARS!
 
 # Coupler history
