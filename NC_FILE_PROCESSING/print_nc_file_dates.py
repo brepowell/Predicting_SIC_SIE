@@ -11,17 +11,18 @@ def main():
     args = parser.parse_args()
 
     # Determine whether the argument is a directory or a file
-    if os.path.isdir(args.path):
-        runDir = args.path
+    # if os.path.isdir(args.path):
+    #     runDir = args.path
         
-        #TODO - MAKE THIS ITERATE THROUGH ALL FILES IN A FOLDER
-        output = load_data(runDir, fileName)
-        days = get_number_of_days(output)
+    #     #TODO - MAKE THIS ITERATE THROUGH ALL FILES IN A FOLDER
+    #     output = load_data(runDir, fileName)
+    #     days = get_number_of_days(output)
 
-    elif os.path.isfile(args.path):
+    if os.path.isfile(args.path):
         runDir, fileName = os.path.split(args.path)
         output = load_data(runDir, fileName)
         days = get_number_of_days(output)
+
     else:
         raise ValueError("Provided path is neither a valid file nor a directory.")
 

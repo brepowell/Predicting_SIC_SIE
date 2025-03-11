@@ -95,6 +95,9 @@ def load_data(path_to_nc_file, output_file_name="", print_read_statement=True):
     
     if print_read_statement:
         print('======= Read Output: ', path_to_nc_file)
+
+    if output_file_name
+        
     return netCDF4.Dataset(path_to_nc_file + output_file_name)
 
 def load_all(path_to_nc_file, mesh_file_name, output_file_name):
