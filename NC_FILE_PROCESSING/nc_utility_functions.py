@@ -12,27 +12,28 @@ import os
 
 def gather_files(useFullPath = True, path = FULL_PATH):
     """ Use the subdirectory specified in the config file. 
-    Get all files in that folder. """
-    filesToPlot = []
+    Get all files in that folder. Return a list of .nc files sorted alphabetically. """
+    all_nc_files_in_folder = []
     print("Path to files is ", path)
 
     if useFullPath:
         for root, dirs, files in os.walk(path, topdown=False):
             for name in files:
                 if name.endswith('.nc'):
-                    filesToPlot.append(os.path.join(root, name))
+                    all_nc_files_in_folder.append(os.path.join(root, name))
 
     else:
         for root, dirs, files in os.walk(path, topdown=False):
             for name in files:
                 if name.endswith('.nc'):
-                    filesToPlot.append(name)
+                    all_nc_files_in_folder.append(name)
 
-    print("Read this many files: ", len(filesToPlot))
+    print("Read this many files: ", len(all_nc_files_in_folder))
 
-    return filesToPlot
+    # Sort the list alphabetically before returning
+    return sorted(all_nc_files_in_folder)
 
-def check_if_nc_files_exist_in_directory(directory):
+def get_nc_files_from_directory(directory):
 
     if not os.path.isdir(directory):
         raise ValueError(f"Invalid directory: {directory}")
@@ -51,7 +52,7 @@ def check_if_Daily_or_Monthly(directory):
              False if there is a mix or neither.
     """
 
-    files = check_if_nc_files_exist_in_directory(directory)
+    files = get_nc_files_from_directory(directory)
     
     if not files:
         print("No files found in the directory.")
@@ -76,8 +77,8 @@ def load_mesh(path_to_nc_file, mesh_file_name="", print_read_statement=True):
     The mesh must have the same resolution as the output file. 
     Return the latCell and lonCell variables. """
 
-    if not os.path.isdir(path_to_nc_file):
-        raise ValueError(f"Invalid directory: {path_to_nc_file}")
+    if not os.path.exists(path_to_nc_file):  # Check if file exists
+        raise FileNotFoundError(f"File not found: {path_to_nc_file}")
     
     if print_read_statement:
         print('======= Read Mesh: ', path_to_nc_file, mesh_file_name)
@@ -90,20 +91,23 @@ def load_mesh(path_to_nc_file, mesh_file_name="", print_read_statement=True):
 
 def load_data(path_to_nc_file, output_file_name="", print_read_statement=True):
     """ Load the data from an .nc output file. """
-    if not os.path.exists(path_to_nc_file):  # Check if file exists
-        raise FileNotFoundError(f"File not found: {path_to_nc_file}")
+
+    #path_2_use = perlmutterpath2 + outputFileName
+    
+    # if not os.path.exists(path_to_nc_file):  # Check if file exists
+    #     raise FileNotFoundError(f"File not found: {path_to_nc_file}")
     
     if print_read_statement:
         print('======= Read Output: ', path_to_nc_file)
 
-    if output_file_name
-        
+    #TODO ADD A CHECK FOR ACCIDENTALLY HAVING SOMETHING OTHER THAN A STRING FOR THE 2ND PARAMETER
+    
     return netCDF4.Dataset(path_to_nc_file + output_file_name)
 
 def load_all(path_to_nc_file, mesh_file_name, output_file_name):
     """ Load the mesh and data to plot. """
 
-    files = check_if_nc_files_exist_in_directory(path_to_nc_file)
+    files = get_nc_files_from_directory(path_to_nc_file)
 
     if not files:
         print("No .nc files found in the directory.")
@@ -127,7 +131,7 @@ def get_number_of_days(output, keyVariableToPlot=VARIABLETOPLOT):
     and at the variable you have chosen to plot. """
 
     count = output.variables[NC_TIME_COUNT_VARIABLE]
-    print("Count is ", count.shape)
+    print("Count of days is ", count.shape)
 
     variableForAllDays = output.variables[keyVariableToPlot][:]
 

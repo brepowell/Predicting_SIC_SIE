@@ -12,19 +12,21 @@ from perlmutterpath import *
 ####################                                                                                                                            ####################
 
 # Change these for different runs if you want to narrow down your focus
-#VARIABLETOPLOT     = "timeDaily_avg_iceAreaCell"   # The variable to plot from the E3SM data
+VARIABLETOPLOT     = "timeDaily_avg_iceAreaCell"   # The variable to plot from the E3SM data
 #VARIABLETOPLOT      = "freeboard"                   # The variable to plot from the satellite data
 #VARIABLETOPLOT      = "samplemf" # make sure to set VMAX
 #VARIABLETOPLOT      = "sampleof"
 #VARIABLETOPLOT       = "meanof"
-VARIABLETOPLOT       = "stdof"
+#VARIABLETOPLOT       = "stdof"
 #VARIABLETOPLOT      = "meanmf"
 
 TIMESTRINGVARIABLE  = "time_string"      # Used from E3SM data
-#START_TIME_VARIABLE = "xtime_startDaily" # Used in making a netCDF file
-START_TIME_VARIABLE = "time_string"
+START_TIME_VARIABLE = "xtime_startDaily" # Used in making a netCDF file
+
+#START_TIME_VARIABLE = "time_string"
 END_TIME_VARIABLE   = ""
 TIMEVARIABLE        = "time"
+NC_TIME_COUNT_VARIABLE = "timeDaily_counter"
 
 LATITUDEVARIABLE    = "latCell"    #latitude
 LONGITUDEVARIABLE   = "lonCell"   #longitude
@@ -71,8 +73,8 @@ INTERVALS = 500 # good for smaller animations, like 5 to 10 days
 ################
 
 #runDir = ""
-runDir         = os.path.dirname(os.path.abspath(__file__))       # Get current directory path
-#runDir = perlmutterpath1 # For perlmutter (PM) only
+#runDir         = os.path.dirname(os.path.abspath(__file__))       # Get current directory path
+runDir = perlmutterpath2 # For perlmutter (PM) only
 
 # Change these for different runs if you want to grab other .nc files
 
@@ -84,12 +86,14 @@ meshFileName   = r"\mesh_files\mpassi.IcoswISC30E3r5.20231120.nc"  # for satelli
 #SYNCH_FILE_NAME = r"\mesh_files\E3SM_IcoswISC30E3r5_ICESat_Orbital_Synchronizer.nc"
 SYNCH_FILE_NAME = r"/mesh_files/E3SM_IcoswISC30E3r5_ICESat_Orbital_Synchronizer.nc" #PM
 
+outputFileName = r"/10yrFebruaryExample.nc"
+
 #outputFileName = r"\output_files\Breanna_D_test_1x05_days.mpassi.hist.am.timeSeriesStatsDaily.0001-01-01.nc"  # 5-day Ice Area
 #outputFileName = r"\output_files\Breanna_D_test_1x10_days.mpassi.hist.am.timeSeriesStatsDaily.0001-01-01.nc"  # 10-day Ice Area
 #outputFileName = r"\satellite_data_preprocessed\one_day\icesat_E3SM_spring_2008_02_22_14.nc" # One Satellite Track
 #outputFileName = r"/output_files/Breanna_D_test_5_nodes_1_nyears_with_fewer_nodes.mpassi.hist.am.timeSeriesStatsDaily.0001-01-01.nc" # 1-year, month 1
 #outputFileName = r"\new.nc" # Satellite emulator
-outputFileName = f"/{NEW_NETCDF_FILE_NAME}" # Satellite emulator on PM
+#outputFileName = f"/{NEW_NETCDF_FILE_NAME}" # Satellite emulator on PM
 
 #subdirectory = "" # Use when running make_a_netCDF_file.py
 #subdirectory = r"/satellite_data_preprocessed/one_month" # Satellite Track folder for one month

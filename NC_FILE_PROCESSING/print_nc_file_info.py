@@ -3,7 +3,9 @@ import argparse
 from nc_utility_functions import *
 
 def main():
-    """ This requires a path to a file that is in the same directory. """
+    """ This requires a path to a file that is in the same directory. 
+    TODO: MAKE THIS WORK ON ANY PATH ON PERLMUTTER - FOR SOME REASON, IT DOESN'T WORK ON FILES IN ANY OTHER DIRECTORY.
+    """
     
     parser = argparse.ArgumentParser(description="Load data from a specified file.")
     parser.add_argument("path", help="Path to the file")
