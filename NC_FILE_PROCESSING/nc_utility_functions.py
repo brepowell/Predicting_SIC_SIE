@@ -67,6 +67,20 @@ def check_if_Daily_or_Monthly(directory):
         return "Monthly"
     else:
         return False  # Mixed or neither
+
+def validate_path(directory_or_full_path, file_name=""):
+    if directory_or_full_path == "":
+        raise ValueError("The first parameter in load_mesh needs to be a directory or an .nc file")
+    
+    full_path = directory_or_full_path + file_name
+
+    if not full_path.endswith('.nc'):
+        raise ValueError("This path does not go to an .nc file")
+    
+    if not os.path.exists(full_path):  # Check if file exists
+        raise FileNotFoundError(f"File not found: {full_path}")
+
+    return full_path
     
 #######################
 #    LOADING FILES    #
@@ -77,13 +91,12 @@ def load_mesh(path_to_nc_file, mesh_file_name="", print_read_statement=True):
     The mesh must have the same resolution as the output file. 
     Return the latCell and lonCell variables. """
 
-    if not os.path.exists(path_to_nc_file):  # Check if file exists
-        raise FileNotFoundError(f"File not found: {path_to_nc_file}")
-    
+    full_path = validate_path(path_to_nc_file, mesh_file_name)
+        
     if print_read_statement:
-        print('======= Read Mesh: ', path_to_nc_file, mesh_file_name)
+        print('======= Read Mesh: ', full_path)
 
-    dataset = netCDF4.Dataset(path_to_nc_file + mesh_file_name)
+    dataset = netCDF4.Dataset(full_path)
     latCell = np.degrees(dataset.variables['latCell'][:]) 
     lonCell = np.degrees(dataset.variables['lonCell'][:])
 

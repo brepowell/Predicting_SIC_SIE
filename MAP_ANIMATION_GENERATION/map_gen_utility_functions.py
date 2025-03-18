@@ -7,12 +7,9 @@
 
 # Use the config.py file to specify max latitude, max longitude, file paths, etc.
 # Ensure that you are looking for a variable that exists in the output file
-# Make sure that you navigate to the directory that contains e3sm-data-visualization.py
-# Make sure that nc_utility_functions.py is in a nearby directory
-
-# $ python map_gen_utility_functions.py
 
 import matplotlib as mpl
+import numpy as np
 
 import matplotlib.path as mpath
 import matplotlib.pyplot as plt     # For plotting
@@ -20,7 +17,8 @@ import matplotlib.pyplot as plt     # For plotting
 # Cartopy for map features, like land and ocean
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from NC_FILE_PROCESSING.nc_utility_functions import *
+
+from config import *
 
 def map_hemisphere_north(latCell, lonCell, variableToPlot1Day, title, hemisphereMap, dot_size=DOT_SIZE):
     """ Map the northern hemisphere onto a matplotlib figure. 
@@ -198,40 +196,7 @@ def generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1Day,
 
     return scatter
 
-def generate_map_png_file_name(outputFileName):
-    name_without_extension, _ = os.path.splitext(outputFileName)
+def generate_map_png_file_name(file_path):
+    name_without_directory = os.path.basename(file_path)
+    name_without_extension, _ = os.path.splitext(name_without_directory)
     return name_without_extension + ".png"
-
-def main():
-
-    # Load the mesh and data to plot.
-    #latCell, lonCell = load_mesh(runDir, meshFileName)
-    latCell, lonCell = load_mesh("", meshFileName)
-    output = load_data(runDir, outputFileName)
-
-    ####################################################
-    # PLOTTING REGULAR E3SM OUTPUT DATA, LIKE ICE AREA #
-    ####################################################
-    print("Days total: ", get_number_of_days(output, keyVariableToPlot=VARIABLETOPLOT))
-    variableToPlot1Day = reduce_to_one_dimension(output, keyVariableToPlot=VARIABLETOPLOT, dayNumber=1)
-    
-    ##############################
-    # PLOTTING MY NEW.NC RESULTS #
-    ##############################
-    # print("nCells total: ", get_number_of_days(output, keyVariableToPlot=VARIABLETOPLOT))
-    # variableToPlot1Day = output.variables[VARIABLETOPLOT][:]
-    # variableToPlot1Day.ravel()
-    # print(variableToPlot1Day.shape)
-
-    ###################
-    # ARTIC-ONLY PLOT #
-    ###################
-    fig, northMap = generate_axes_north_pole()
-
-    mapImageFileName = generate_map_png_file_name(outputFileName)
-
-    # Plotting with a variable
-    generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1Day, mapImageFileName)
-
-if __name__ == "__main__":
-    main()
