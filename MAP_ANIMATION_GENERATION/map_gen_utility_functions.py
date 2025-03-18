@@ -198,6 +198,10 @@ def generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1Day,
 
     return scatter
 
+def generate_map_png_file_name(outputFileName):
+    name_without_extension, _ = os.path.splitext(outputFileName)
+    return name_without_extension + ".png"
+
 def main():
 
     # Load the mesh and data to plot.
@@ -223,6 +227,8 @@ def main():
     # ARTIC-ONLY PLOT #
     ###################
     fig, northMap = generate_axes_north_pole()
+
+    mapImageFileName = generate_map_png_file_name(outputFileName)
 
     # Plotting with a variable
     generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1Day, mapImageFileName)
