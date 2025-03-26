@@ -34,11 +34,32 @@ def gather_files(useFullPath = True, path = FULL_PATH):
     return sorted(all_nc_files_in_folder)
 
 def get_nc_files_from_directory(directory):
-
+    """ Check if this is a directory, then return a list of all the files in the directory. """
     if not os.path.isdir(directory):
         raise ValueError(f"Invalid directory: {directory}")
 
     return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+
+def validate_path(directory_or_full_path, file_name=""):
+    """ Take in a directory or full path and a file name. Check if the path leads to a .nc file. Return the full path. """
+    
+    if directory_or_full_path == "":
+        raise ValueError("The first parameter in load_mesh needs to be a directory or an .nc file")
+    
+    full_path = directory_or_full_path + file_name
+
+    if not full_path.endswith('.nc'):
+        raise ValueError("This path does not go to an .nc file")
+    
+    if not os.path.exists(full_path):  # Check if file exists
+        raise FileNotFoundError(f"File not found: {full_path}")
+
+    return full_path
+
+
+#########################
+#    FILE NAME UTILS    #
+#########################
 
 def check_if_Daily_or_Monthly(directory):
     """
@@ -68,20 +89,62 @@ def check_if_Daily_or_Monthly(directory):
     else:
         return False  # Mixed or neither
 
-def validate_path(directory_or_full_path, file_name=""):
-    if directory_or_full_path == "":
-        raise ValueError("The first parameter in load_mesh needs to be a directory or an .nc file")
-    
-    full_path = directory_or_full_path + file_name
 
-    if not full_path.endswith('.nc'):
-        raise ValueError("This path does not go to an .nc file")
-    
-    if not os.path.exists(full_path):  # Check if file exists
-        raise FileNotFoundError(f"File not found: {full_path}")
+def get_date_string_from_file_name(path_to_nc_file):
+    """Checks if a string is in the format YYYY-MM-DD.
+    Assumes files are named with the format *YYYY-MM-DD.nc
+    """
+    date_string = path_to_nc_file[-13:-3]
+    print(date_string)
 
-    return full_path
+    try:
+        datetime.strptime(date_string, "%Y-%m-%d")
+        return date_string
+    except ValueError:
+        return None
+
+def is_valid_ymd(date_string):
+    """
+    Checks if a string is in the format YYYY-MM-DD and represents a valid date.
+
+    Args:
+        date_string: The string to check.
+
+    Returns:
+        True if the string is a valid date in YYYY-MM-DD format, False otherwise.
+    """
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_string):
+        return False
+    try:
+        datetime.datetime.strptime(date_string, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+def get_year_from_file_name(path_to_nc_file):
+    """Returns a string with the year.
+    Assumes files are named with the format *YYYY-MM-DD.nc
+    """
+    date_string = get_date_string_from_file_name(path_to_nc_file)
+
+    try:
+        is_valid_ymd(date_string)
+        return date_string[0:4]
+    except ValueError:
+        return None
     
+def get_year_from_date_string(date_string):
+    """Get the year. Assumes the format *YYYY-MM-DD.nc"""
+    return date_string[0:4]
+
+def get_month_from_date_string(date_string):
+    """Get the month. Assumes the format *YYYY-MM-DD.nc"""
+    return date_string[5:7]
+
+def get_day_from_date_string(date_string):
+    """Get the day. Assumes the format *YYYY-MM-DD.nc"""
+    return date_string[8:10]
+
 #######################
 #    LOADING FILES    #
 #######################
