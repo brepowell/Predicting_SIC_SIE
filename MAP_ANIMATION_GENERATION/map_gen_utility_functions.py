@@ -199,7 +199,11 @@ def generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1D, m
 
     return scatter
 
-def generate_map_png_file_name(file_path):
-    name_without_directory = os.path.basename(file_path)
-    name_without_extension, _ = os.path.splitext(name_without_directory)
-    return name_without_extension + ".png"
+def generate_static_map_png_file_name(file_path, day=1):    
+    """Generate a PNG file name based on the .nc file name and a given day.
+    
+    Assumes the .nc file name contains a date, and the last two characters before 
+    the extension are replaced with the day number.
+    """
+    name_without_extension = os.path.splitext(os.path.basename(file_path))[0][:-2]  
+    return f"{name_without_extension}{day:02d}.png"

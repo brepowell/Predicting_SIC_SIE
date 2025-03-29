@@ -12,7 +12,7 @@ import os
 
 def gather_files(useFullPath = True, path = FULL_PATH):
     """ Use the subdirectory specified in the config file. 
-    Get all files in that folder. Return a list of .nc files sorted alphabetically. """
+    Get all netCDF files in that folder. Return a list of .nc files sorted alphabetically. """
     all_nc_files_in_folder = []
     print("Path to files is ", path)
 
@@ -33,13 +33,6 @@ def gather_files(useFullPath = True, path = FULL_PATH):
     # Sort the list alphabetically before returning
     return sorted(all_nc_files_in_folder)
 
-def get_nc_files_from_directory(directory):
-    """ Check if this is a directory, then return a list of all the files in the directory. """
-    if not os.path.isdir(directory):
-        raise ValueError(f"Invalid directory: {directory}")
-
-    return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-
 def validate_path(directory_or_full_path, file_name=""):
     """ Take in a directory or full path and a file name. Check if the path leads to a .nc file. Return the full path. """
     
@@ -56,39 +49,41 @@ def validate_path(directory_or_full_path, file_name=""):
 
     return full_path
 
+#######################
+#    LOADING FILES    #
+#######################
+
+def load_mesh(path_to_nc_file, mesh_file_name="", print_read_statement=True):
+    """ Load the mesh from an .nc file. 
+    The mesh must have the same resolution as the output file. 
+    Return the latCell and lonCell variables. """
+
+    full_path = validate_path(path_to_nc_file, mesh_file_name)
+        
+    if print_read_statement:
+        print('======= Read Mesh: ', full_path)
+
+    dataset = netCDF4.Dataset(full_path)
+    latCell = np.degrees(dataset.variables['latCell'][:]) 
+    lonCell = np.degrees(dataset.variables['lonCell'][:])
+
+    return latCell, lonCell
+
+def load_data(path_to_nc_file, output_file_name="", print_read_statement=True):
+    """ Load the data from an .nc output file. """
+
+    #TODO ADD A CHECK FOR ACCIDENTALLY HAVING SOMETHING OTHER THAN A STRING FOR THE 2ND PARAMETER
+    
+    full_path = validate_path(path_to_nc_file, output_file_name)
+    
+    if print_read_statement:
+        print('======= Read Output: ', full_path)
+
+    return netCDF4.Dataset(full_path)
 
 #########################
 #    FILE NAME UTILS    #
 #########################
-
-def check_if_Daily_or_Monthly(directory):
-    """
-    Check if all files in a directory contain either 'Daily' or 'Monthly' in their names.
-
-    Args:
-        directory (str): Path to the directory.
-
-    Returns:
-        str: "Daily" if all files contain "Daily", "Monthly" if all files contain "Monthly",
-             False if there is a mix or neither.
-    """
-
-    files = get_nc_files_from_directory(directory)
-    
-    if not files:
-        print("No files found in the directory.")
-        return False
-
-    contains_daily = all("Daily" in f for f in files)
-    contains_monthly = all("Monthly" in f for f in files)
-
-    if contains_daily:
-        return "Daily"
-    elif contains_monthly:
-        return "Monthly"
-    else:
-        return False  # Mixed or neither
-
 
 def get_date_string_from_file_name(path_to_nc_file):
     """Checks if a string is in the format YYYY-MM-DD.
@@ -146,59 +141,6 @@ def get_day_from_date_string(date_string):
     return date_string[8:10]
 
 #######################
-#    LOADING FILES    #
-#######################
-
-def load_mesh(path_to_nc_file, mesh_file_name="", print_read_statement=True):
-    """ Load the mesh from an .nc file. 
-    The mesh must have the same resolution as the output file. 
-    Return the latCell and lonCell variables. """
-
-    full_path = validate_path(path_to_nc_file, mesh_file_name)
-        
-    if print_read_statement:
-        print('======= Read Mesh: ', full_path)
-
-    dataset = netCDF4.Dataset(full_path)
-    latCell = np.degrees(dataset.variables['latCell'][:]) 
-    lonCell = np.degrees(dataset.variables['lonCell'][:])
-
-    return latCell, lonCell
-
-def load_data(path_to_nc_file, output_file_name="", print_read_statement=True):
-    """ Load the data from an .nc output file. """
-
-    #path_2_use = perlmutterpath2 + outputFileName
-    
-    # if not os.path.exists(path_to_nc_file):  # Check if file exists
-    #     raise FileNotFoundError(f"File not found: {path_to_nc_file}")
-    
-    if print_read_statement:
-        print('======= Read Output: ', path_to_nc_file)
-
-    #TODO ADD A CHECK FOR ACCIDENTALLY HAVING SOMETHING OTHER THAN A STRING FOR THE 2ND PARAMETER
-    
-    return netCDF4.Dataset(path_to_nc_file + output_file_name)
-
-def load_all(path_to_nc_file, mesh_file_name, output_file_name):
-    """ Load the mesh and data to plot. """
-
-    files = get_nc_files_from_directory(path_to_nc_file)
-
-    if not files:
-        print("No .nc files found in the directory.")
-        raise FileNotFoundError(f"File not found: {path_to_nc_file}")
-
-    latCell, lonCell    = load_mesh(path_to_nc_file, mesh_file_name)
-    output              = load_data(path_to_nc_file, output_file_name) # TODO MAKE THIS DYNAMIC
-    #days                = getNumberOfDays(output, keyVariableToPlot=VARIABLETOPLOT)
-
-    # TODO: For the netCDF make this not hard coded
-    days                = 1
-
-    return latCell, lonCell, output, days
-
-#######################
 #   TIME VARIABLES    #
 #######################
 
@@ -210,8 +152,7 @@ def get_number_of_days(output, keyVariableToPlot=VARIABLETOPLOT):
     print("Count of days is ", count.shape)
 
     variableForAllDays = output.variables[keyVariableToPlot][:]
-
-    print("Shape is", variableForAllDays.shape)
+    print("Shape of variable to plot is", variableForAllDays.shape)
 
     return variableForAllDays.shape[0]
 
