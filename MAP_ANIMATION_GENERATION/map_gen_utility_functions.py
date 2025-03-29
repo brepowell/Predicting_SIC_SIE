@@ -124,17 +124,21 @@ def generate_axes_north_pole():
     return fig, northMap
 
 def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, variableToPlot1D, mapImageFileName, 
-                                  timeStamp="YYYY:DD:HH:MM", colorBarOn=COLORBARON, grid=GRIDON,
+                                  colorBarOn=COLORBARON, grid=GRIDON,
                                   oceanFeature=OCEANFEATURE, landFeature=LANDFEATURE, 
-                                  coastlines=COASTLINES, dot_size=DOT_SIZE):
+                                  coastlines=COASTLINES, dot_size=DOT_SIZE, textBoxString=""):
     """ Generate 2 maps; one of the north pole and one of the south pole. """
 
+    print(f"MINLONGITUDE: {MINLONGITUDE}, MAXLONGITUDE: {MAXLONGITUDE}, LAT_LIMIT: {LAT_LIMIT}, NORTHPOLE: {NORTHPOLE}")
+
+    
     # Adjust the margins around the plots (as a fraction of the width or height).
     fig.subplots_adjust(bottom=0.05, top=0.85, left=0.04, right=0.95, wspace=0.02)
 
     # Set your viewpoint (the bounding box for what you will see).
     # You want to see the full range of longitude values, since this is a polar plot.
     # The range for the latitudes should be from your latitude limit (i.e. 50 degrees or -50 to the pole at 90 or -90).
+    
     northMap.set_extent([MINLONGITUDE, MAXLONGITUDE,  LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
     southMap.set_extent([MINLONGITUDE, MAXLONGITUDE, -LAT_LIMIT, SOUTHPOLE], ccrs.PlateCarree())
 
@@ -147,8 +151,16 @@ def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, var
     southMap.set_boundary(make_circle(), transform=southMap.transAxes)
 
     # Map the 2 hemispheres.
-    northPoleScatter = map_hemisphere_north(latCell, lonCell, variableToPlot1D, "Arctic Sea Ice", northMap, dot_size=dot_size)     # Map northern hemisphere
-    southPoleScatter = map_hemisphere_southern(latCell, lonCell, variableToPlot1D, "Antarctic Sea Ice", southMap, dot_size=dot_size)  # Map southern hemisphere
+    northPoleScatter = map_hemisphere_north(latCell, lonCell, variableToPlot1D, "Arctic Sea Ice", northMap, dot_size=dot_size)
+    southPoleScatter = map_hemisphere_southern(latCell, lonCell, variableToPlot1D, "Antarctic Sea Ice", southMap, dot_size=dot_size)
+
+    print(f"northPoleScatter: {northPoleScatter}")  
+    print(f"southPoleScatter: {southPoleScatter}")  
+    
+    if textBoxString != "":
+        # Add the timestamp to the North Map on the left side
+        textBox = northMap.text(0.05, 0.95, textBoxString, transform=northMap.transAxes, fontsize=14,
+            verticalalignment='top', bbox=boxStyling, zorder=5)
 
     # Set Color Bar
     if colorBarOn:
@@ -156,18 +168,19 @@ def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, var
         plt.colorbar(southPoleScatter, ax=southMap)
 
     # Add time textbox
-    plt.suptitle(MAP_SUPTITLE_TOP, size="x-large", fontweight="bold")
+    plt.suptitle(suptitle_variable_year(), size="x-large", fontweight="bold")
 
-    # Save the maps as an image.
-    #plt.savefig(mapImageFileName) # TODO: ADD THIS BACK IN. TRYING TO SAVE TIME ON PLOTTING 1 YEAR
+    # Save the maps as an image
+    plt.savefig(mapImageFileName)
 
-    return northPoleScatter, southPoleScatter
+    #return northPoleScatter, southPoleScatter
+    #return southPoleScatter
 
 def generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1D, mapImageFileName, 
-                         timeStamp="YYYY:DD:HH:MM", colorBarOn=COLORBARON, grid=GRIDON,
+                         colorBarOn=COLORBARON, grid=GRIDON,
                          oceanFeature=OCEANFEATURE, landFeature=LANDFEATURE, 
                          coastlines=COASTLINES, dot_size=DOT_SIZE):
-    """ Generate one map of the north pole. """
+    """ Generate one map of the north pole. No timestamp. """
 
     print("--- starting to make a map of the Arctic ---")
     
