@@ -21,22 +21,18 @@ def generate_daily_pngs_from_one_nc_file_with_multiple_days():
 
     fig, northMap, southMap = generate_axes_north_and_south_pole()
 
-    print(f"northMap: {northMap}")  
-    print(f"southMap: {southMap}") 
-
-    # Parallel this loop!
+    # TODO - MAKE THIS RUN IN PARALLEL
     #for i in range(days):
-
-    i = 1
+    i = 0
     # Get the time for this day
     textBoxString = "Time: " + str(timeList[i])
     
     variableForOneDay = reduce_to_one_dimension(output, keyVariableToPlot=VARIABLETOPLOT, dayNumber=i)
-
-    mapImageFileName = generate_static_map_png_file_name(outputFileName, day=i)
-
+    
+    mapImageFileName = generate_static_map_png_file_name(outputFileName, day=i+1)
+    
     generate_maps_north_and_south(fig, northMap, southMap, 
                                                                        latCell, lonCell, variableForOneDay, 
                                                                        mapImageFileName,
                                                                        textBoxString=textBoxString)
-    print("Saved Day: ", i)
+    print("Saved file: ", mapImageFileName)

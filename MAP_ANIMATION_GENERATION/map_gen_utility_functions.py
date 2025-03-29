@@ -129,9 +129,6 @@ def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, var
                                   coastlines=COASTLINES, dot_size=DOT_SIZE, textBoxString=""):
     """ Generate 2 maps; one of the north pole and one of the south pole. """
 
-    print(f"MINLONGITUDE: {MINLONGITUDE}, MAXLONGITUDE: {MAXLONGITUDE}, LAT_LIMIT: {LAT_LIMIT}, NORTHPOLE: {NORTHPOLE}")
-
-    
     # Adjust the margins around the plots (as a fraction of the width or height).
     fig.subplots_adjust(bottom=0.05, top=0.85, left=0.04, right=0.95, wspace=0.02)
 
@@ -153,28 +150,26 @@ def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, var
     # Map the 2 hemispheres.
     northPoleScatter = map_hemisphere_north(latCell, lonCell, variableToPlot1D, "Arctic Sea Ice", northMap, dot_size=dot_size)
     southPoleScatter = map_hemisphere_southern(latCell, lonCell, variableToPlot1D, "Antarctic Sea Ice", southMap, dot_size=dot_size)
-
-    print(f"northPoleScatter: {northPoleScatter}")  
-    print(f"southPoleScatter: {southPoleScatter}")  
     
-    if textBoxString != "":
-        # Add the timestamp to the North Map on the left side
+    # Add the timestamp to the North Map on the left side
+    if textBoxString != "":    
         textBox = northMap.text(0.05, 0.95, textBoxString, transform=northMap.transAxes, fontsize=14,
             verticalalignment='top', bbox=boxStyling, zorder=5)
 
-    # Set Color Bar
+    # Set Color Bar - make sure this is the last thing you add to the map!
     if colorBarOn:
         plt.colorbar(northPoleScatter, ax=northMap)
         plt.colorbar(southPoleScatter, ax=southMap)
 
-    # Add time textbox
+    # Add the bold title at the top
     plt.suptitle(suptitle_variable_year(), size="x-large", fontweight="bold")
 
     # Save the maps as an image
     plt.savefig(mapImageFileName)
 
-    #return northPoleScatter, southPoleScatter
-    #return southPoleScatter
+    plt.close(fig)
+
+    return northPoleScatter, southPoleScatter
 
 def generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1D, mapImageFileName, 
                          colorBarOn=COLORBARON, grid=GRIDON,
@@ -201,7 +196,7 @@ def generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1D, m
     # Map the hemisphere
     scatter = map_hemisphere_north(latCell, lonCell, variableToPlot1D, f"Arctic Sea Ice", northMap, dot_size)     # Map northern hemisphere
     
-    # Set Color Bar
+    # Set Color Bar - make sure this is the last thing you add to the map!
     if colorBarOn:
         plt.colorbar(scatter, ax=northMap)
 
@@ -209,6 +204,8 @@ def generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1D, m
 
     # Save the maps as an image.
     plt.savefig(mapImageFileName)
+
+    plt.close(fig)
 
     return scatter
 
