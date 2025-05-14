@@ -15,6 +15,7 @@ import matplotlib.path as mpath
 import matplotlib.pyplot as plt     # For plotting
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.cm import get_cmap
 
 # Cartopy for map features, like land and ocean
 import cartopy.crs as ccrs
@@ -342,45 +343,47 @@ def map_all_lats_lons_gradient_by_index(fig, latCell, lonCell, northMap, southMa
     return northPoleScatter, southPoleScatter, plateCarScatter, orthoMapScatter, robinMapScatter, rotPolMapScatter
 
 def map_all_lats_lons_binned_by_index(fig, latCell, lonCell, northMap, southMap, plateCar, orthoMap, robinMap, rotPolMap, dot_size=DOT_SIZE):
-    """ Map points with discrete color bins based on index range. """
+    """ Map points with discrete color bins based on index range (~50k per bin). """
 
     # Create global index array
     all_indices = np.arange(len(latCell))
 
-    # Define bin boundaries and colors
-    boundaries = [0, 100000, 200000, 300000, 400000, len(latCell)]
-    colors = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00"]  # 5 distinct bins/colors
+    # Define bin size and calculate boundaries
+    bin_size = 50000
+    max_index = len(latCell)
+    boundaries = list(range(0, max_index, bin_size)) + [max_index]  # Ensure last bin includes all
+    num_bins = len(boundaries) - 1
 
+    # Generate distinct colors using a perceptually uniform colormap
+    base_cmap = get_cmap("tab20")  # or try "Set3", "nipy_spectral", etc.
+    colors = [base_cmap(i / num_bins) for i in range(num_bins)]
+    
     # Assign each index to a bin
     bin_indices = np.digitize(all_indices, boundaries) - 1  # subtract 1 to index into `colors`
+    scatter_colors = [colors[i] for i in bin_indices]
 
-    # Set up discrete colormap
+    # Set up discrete colormap and norm
     cmap = ListedColormap(colors)
     norm = BoundaryNorm(boundaries, ncolors=cmap.N)
 
-    scatter_colors = [colors[i] for i in bin_indices]
-    
-
     # Adjust margins
-    fig.subplots_adjust(bottom=0.05, top=0.85, left=0.04, right=0.95, wspace=0.02)
-    
-    # Set map extents
-    northMap.set_extent([MINLONGITUDE, MAXLONGITUDE, LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
-    southMap.set_extent([MINLONGITUDE, MAXLONGITUDE, -LAT_LIMIT, SOUTHPOLE], ccrs.PlateCarree())
-    
-    # Add features
+    fig.subplots_adjust(bottom=0.05, top=0.85, left=0.04, right=0.95, wspace=0.02, hspace=0.15)
+
+    # Set map extents and features
+    for ax, extent in zip(
+        [northMap, southMap],
+        [[LAT_LIMIT, NORTHPOLE], [-LAT_LIMIT, SOUTHPOLE]]
+    ):
+        ax.set_extent([MINLONGITUDE, MAXLONGITUDE] + extent, ccrs.PlateCarree())
+        ax.set_boundary(make_circle(), transform=ax.transAxes)
+
     for ax in [northMap, southMap, plateCar, orthoMap, robinMap, rotPolMap]:
         add_map_features(ax)
 
-    # Round map edges
-    northMap.set_boundary(make_circle(), transform=northMap.transAxes)
-    southMap.set_boundary(make_circle(), transform=southMap.transAxes)
-
-    # Add polar labels
     add_polar_labels(northMap, hemisphere='north')
     add_polar_labels(southMap, hemisphere='south')
 
-    # Plot on all maps using binned indices
+    # Plot scatter on all maps
     scatters = []
     for ax in [northMap, southMap, plateCar, orthoMap, robinMap, rotPolMap]:
         sc = ax.scatter(lonCell, latCell,
@@ -391,7 +394,7 @@ def map_all_lats_lons_binned_by_index(fig, latCell, lonCell, northMap, southMap,
                         transform=ccrs.PlateCarree())
         scatters.append(sc)
 
-    # Create unified colorbar
+    # Colorbar
     cbar = fig.colorbar(mpl.cm.ScalarMappable(cmap=cmap, norm=norm),
                         ax=[northMap, southMap, plateCar, orthoMap, robinMap, rotPolMap],
                         orientation='horizontal',
@@ -401,15 +404,19 @@ def map_all_lats_lons_binned_by_index(fig, latCell, lonCell, northMap, southMap,
                         aspect=30,
                         location='bottom')
 
-    # Calculate bin centers for labels
-    bin_centers = [(boundaries[i] + boundaries[i+1]) / 2 for i in range(len(boundaries)-1)]
+    # Center ticks and dynamic labels
+    bin_centers = [(boundaries[i] + boundaries[i+1]) / 2 for i in range(num_bins)]
     cbar.set_ticks(bin_centers)
-    
-    cbar.set_ticklabels(['0–99k', '100k–199k', '200k–299k', '300k–399k', '400k+'])
+
+    def format_tick_label(start, end):
+        return f"{start//1000}k–{(end-1)//1000}k" if end < max_index else f"{start//1000}k+"
+
+    tick_labels = [format_tick_label(boundaries[i], boundaries[i+1]) for i in range(num_bins)]
+    cbar.set_ticklabels(tick_labels)
     cbar.set_label('Index Ranges')
 
     # Final touches
-    plt.suptitle("Mesh by Index Ranges", size="x-large", fontweight="bold")
+    plt.suptitle("Mesh by Index Ranges (~50k)", size="x-large", fontweight="bold")
     plt.savefig("mesh_color_all_binned.png")
     plt.close(fig)
 
