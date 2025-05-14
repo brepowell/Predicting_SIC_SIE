@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.path as mpath
 import matplotlib.pyplot as plt     # For plotting
+from matplotlib.colors import LinearSegmentedColormap
 
 # Cartopy for map features, like land and ocean
 import cartopy.crs as ccrs
@@ -58,22 +59,158 @@ def map_hemisphere_southern(latCell, lonCell, variableToPlot1D, title, hemispher
 
     return sc
 
-def map_lats_lons_one_color(latCell, lonCell, title, hemisphereMap, dot_size=DOT_SIZE):
+def map_lats_lons_one_color(fig, latCell, lonCell, hemisphereMap, dot_size=DOT_SIZE):
     """ Map the northern hemisphere onto a matplotlib figure. 
     This requires latCell and lonCell to be filled by a mesh file.
     It also requires variableToPlot1D to be filled by an output .nc file. 
     Returns a scatter plot. """
 
     indices = np.where(latCell > LAT_LIMIT)     # Only capture points between the lat limit and the pole.
-    
+
     norm=mpl.colors.Normalize(VMIN, VMAX)
+
+    # Adjust layout
+    fig.subplots_adjust(bottom=0.05, top=0.85, left=0.04, right=0.95, wspace=0.02)
+    hemisphereMap.set_extent([MINLONGITUDE, MAXLONGITUDE, LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
+    add_map_features(hemisphereMap)
+    hemisphereMap.set_boundary(make_circle(), transform=hemisphereMap.transAxes)
+    
     sc = hemisphereMap.scatter(lonCell[indices], latCell[indices],
                                s=dot_size, color = 'hotpink', transform=ccrs.PlateCarree(),
                                norm=norm)
-    hemisphereMap.set_title(title)
+    hemisphereMap.set_title("Mesh in one color")
     hemisphereMap.axis('off')
 
+    plt.suptitle("Mesh", size="x-large", fontweight="bold")
+
+    # Save the maps as an image
+    plt.savefig("mesh_pink.png")
+
+    plt.close(fig)
+
     return sc
+
+def map_lats_lons_gradient_by_index(fig, latCell, lonCell, hemisphereMap, dot_size=DOT_SIZE):
+    """ Map points with a gradient from white to dark, scaled across all cells. """
+
+    # Create global index array based on all cells
+    all_indices = np.arange(len(latCell))
+
+    # Normalize over the full range
+    norm = mpl.colors.Normalize(vmin=0, vmax=len(latCell) - 1)
+
+    # Create custom colormap
+    cmap = LinearSegmentedColormap.from_list("white_to_dark", ["white", "navy"])
+
+    # Filter the points to plot
+    mask = latCell > LAT_LIMIT
+    filtered_lat = latCell[mask]
+    filtered_lon = lonCell[mask]
+    filtered_indices = all_indices[mask]  # These are the indices to be color-mapped
+
+    # Adjust layout
+    fig.subplots_adjust(bottom=0.05, top=0.85, left=0.04, right=0.95, wspace=0.02)
+    hemisphereMap.set_extent([MINLONGITUDE, MAXLONGITUDE, LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
+    add_map_features(hemisphereMap)
+    hemisphereMap.set_boundary(make_circle(), transform=hemisphereMap.transAxes)
+
+    # Plot only the filtered points, but use color values from the full gradient
+    sc = hemisphereMap.scatter(filtered_lon, filtered_lat,
+                               s=dot_size,
+                               c=filtered_indices,
+                               cmap=cmap,
+                               norm=norm,
+                               transform=ccrs.PlateCarree())
+
+    # Colorbar setup (based on the full index range)
+    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array(all_indices)
+    plt.colorbar(sm, ax=hemisphereMap, orientation='vertical', label='Index (all cells)')
+
+    hemisphereMap.set_title("Mesh in a gradient")
+    hemisphereMap.axis('off')
+    plt.suptitle("Mesh", size="x-large", fontweight="bold")
+    plt.savefig("mesh_color.png")
+    plt.close(fig)
+
+    return sc
+
+def map_all_lats_lons_gradient_by_index(fig, latCell, lonCell, northMap, southMap, plateCar, rotPole, dot_size=DOT_SIZE):
+    """ Map points with a gradient from white to dark, scaled across all cells. """
+
+    # Create global index array based on all cells
+    all_indices = np.arange(len(latCell))
+
+    # Normalize over the full range
+    norm = mpl.colors.Normalize(vmin=0, vmax=len(latCell) - 1)
+
+    # Create custom colormap
+    cmap = LinearSegmentedColormap.from_list("white_to_dark", ["white", "navy"])
+
+    # Adjust the margins around the plots (as a fraction of the width or height).
+    fig.subplots_adjust(bottom=0.05, top=0.85, left=0.04, right=0.95, wspace=0.02)
+    
+    northMap.set_extent([MINLONGITUDE, MAXLONGITUDE,  LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
+    southMap.set_extent([MINLONGITUDE, MAXLONGITUDE, -LAT_LIMIT, SOUTHPOLE], ccrs.PlateCarree())
+    
+    # Add map features, like landFeature and oceanFeature.
+    add_map_features(northMap)
+    add_map_features(southMap)
+    add_map_features(plateCar)
+    add_map_features(rotPole)
+    
+    # Crop the map to be round instead of rectangular.
+    northMap.set_boundary(make_circle(), transform=northMap.transAxes)
+    southMap.set_boundary(make_circle(), transform=southMap.transAxes)
+
+    # Plot the points
+    northPoleScatter = northMap.scatter(lonCell, latCell,
+                               s=DOT_SIZE,
+                               c=all_indices,
+                               cmap=cmap,
+                               norm=norm,
+                               transform=ccrs.PlateCarree())
+
+    southPoleScatter = southMap.scatter(lonCell, latCell,
+                               s=DOT_SIZE,
+                               c=all_indices,
+                               cmap=cmap,
+                               norm=norm,
+                               transform=ccrs.PlateCarree())
+
+    plateCarScatter = plateCar.scatter(lonCell, latCell,
+                               s=DOT_SIZE,
+                               c=all_indices,
+                               cmap=cmap,
+                               norm=norm,
+                               transform=ccrs.PlateCarree())
+
+    rotPolScatter = rotPole.scatter(lonCell, latCell,
+                               s=DOT_SIZE,
+                               c=all_indices,
+                               cmap=cmap,
+                               norm=norm,
+                               transform=ccrs.PlateCarree())
+
+    # Colorbar setup (based on the full index range)
+    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array(all_indices)
+    
+    # Create colorbar for the whole figure 
+    cbar = fig.colorbar(sm, ax=[northMap, southMap, plateCar, rotPole],
+                        orientation='horizontal',  # or 'vertical'
+                        fraction=0.05,  # size of the colorbar
+                        pad=0.08,       # space between colorbar and subplots
+                        shrink=0.8,     # shrink the bar to fit nicely
+                        aspect=30,      # width of colorbar
+                        location='bottom',  # try 'bottom' or 'right'
+                        label='Index (all cells)')
+    
+    plt.suptitle("Mesh", size="x-large", fontweight="bold")
+    plt.savefig("mesh_color_all.png")
+    plt.close(fig)
+    
+    return northPoleScatter, southPoleScatter, plateCarScatter, rotPolScatter
 
 def make_circle():
     """ Use this with Cartopy to make a circular map of the globe, 
@@ -97,6 +234,18 @@ def add_map_features(my_map, oceanFeature=OCEANFEATURE, landFeature=LANDFEATURE,
     if (coastlines == 1):
         my_map.coastlines()
 
+def generate_axes_north_pole():
+    """ Return a figure and axes (map) to use for plotting data for the North Pole. """
+
+    fig = plt.figure(figsize=[5, 5]) #north pole only
+    
+    # Define projections for each map.
+    map_projection_north = ccrs.NorthPolarStereo(central_longitude=270, globe=None)
+    
+    # Create an axes for a map of the Arctic on the figure
+    northMap = fig.add_subplot(1, 1, 1, projection=map_projection_north)
+    return fig, northMap
+
 def generate_axes_north_and_south_pole():
     """ Return a figure and axes (maps) to use for plotting data for the North and South Poles. """
     fig = plt.figure(figsize=[10, 5]) #both north and south pole
@@ -110,18 +259,36 @@ def generate_axes_north_and_south_pole():
     southMap = fig.add_subplot(1, 2, 2, projection=map_projection_south)
 
     return fig, northMap, southMap
-
-def generate_axes_north_pole():
-    """ Return a figure and axes (map) to use for plotting data for the North Pole. """
-
-    fig = plt.figure(figsize=[5, 5]) #north pole only
     
-    # Define projections for each map.
-    map_projection_north = ccrs.NorthPolarStereo(central_longitude=270, globe=None)
-    
-    # Create an axes for a map of the Arctic on the figure
-    northMap = fig.add_subplot(1, 1, 1, projection=map_projection_north)
-    return fig, northMap
+def generate_axes_all_projections():
+    """Return a figure and four axes with different projections in a 2x2 layout."""
+
+    fig = plt.figure(figsize=(10, 10))  # Adjust size as needed
+
+    # Projections
+    north_proj = ccrs.NorthPolarStereo(central_longitude=270)
+    south_proj = ccrs.SouthPolarStereo(central_longitude=90)
+    plate_proj = ccrs.PlateCarree()
+    rotated_proj = ccrs.RotatedPole(pole_longitude=180, pole_latitude=35)
+
+    # Subplot layout:
+    # 1 | 2
+    # -----
+    # 3 | 4
+
+    ax1 = fig.add_subplot(2, 2, 1, projection=north_proj)
+    ax2 = fig.add_subplot(2, 2, 2, projection=south_proj)
+    ax3 = fig.add_subplot(2, 2, 3, projection=plate_proj)
+    ax4 = fig.add_subplot(2, 2, 4, projection=rotated_proj)
+
+    # Set titles
+    ax1.set_title("North Polar Stereo")
+    ax2.set_title("South Polar Stereo")
+    ax3.set_title("Plate Carree")
+    ax4.set_title("Rotated Pole")
+
+    plt.tight_layout()
+    return fig, [ax1, ax2, ax3, ax4]
 
 def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, variableToPlot1D, mapImageFileName, 
                                   colorBarOn=COLORBARON, grid=GRIDON,

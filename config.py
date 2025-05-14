@@ -50,9 +50,9 @@ LAT_LIMIT       =  50  # Good wide view for the north and south poles for E3SM d
 #LAT_LIMIT        =  80  # Extreme closeup for the freeboard of one satellite track
 
 # Change if you want larger or smaller dots for the scatterplot
-DOT_SIZE        = 0.4  # Good for the ice area variable
+#DOT_SIZE        = 0.4  # Good for the ice area variable
 #DOT_SIZE        = 7.0  # Good for satellite tracks
-#DOT_SIZE        = 0.1
+DOT_SIZE        = 0.1
 
 # Change if you want to downsample the amount of data by a certain factor
 DEFAULT_DOWNSAMPLE_FACTOR = 100
@@ -135,14 +135,13 @@ MAX_SUPTITLE_LENGTH = 10
 
 
 # These features are on
-OCEANFEATURE    = 1   
-LANDFEATURE     = 1
 COASTLINES      = 1
 COLORBARON      = 1
 GRIDON          = 1
 
 # These features are off
-# N/A
+OCEANFEATURE    = 0 
+LANDFEATURE     = 0
 
 # Constants
 MAXLONGITUDE    =  180
