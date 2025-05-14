@@ -52,7 +52,7 @@ LAT_LIMIT       =  50  # Good wide view for the north and south poles for E3SM d
 # Change if you want larger or smaller dots for the scatterplot
 #DOT_SIZE        = 0.4  # Good for the ice area variable
 #DOT_SIZE        = 7.0  # Good for satellite tracks
-DOT_SIZE        = 0.1
+DOT_SIZE        = 0.05 # Good for mesh
 
 # Change if you want to downsample the amount of data by a certain factor
 DEFAULT_DOWNSAMPLE_FACTOR = 100
