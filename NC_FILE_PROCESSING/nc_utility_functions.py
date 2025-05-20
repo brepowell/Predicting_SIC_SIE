@@ -12,7 +12,7 @@ import os
 
 def gather_files(useFullPath = True, path = FULL_PATH):
     """ Use the subdirectory specified in the config file. 
-    Get all files in that folder. Return a list of .nc files sorted alphabetically. """
+    Get all netCDF files in that folder. Return a list of .nc files sorted alphabetically. """
     all_nc_files_in_folder = []
     print("Path to files is ", path)
 
@@ -33,42 +33,9 @@ def gather_files(useFullPath = True, path = FULL_PATH):
     # Sort the list alphabetically before returning
     return sorted(all_nc_files_in_folder)
 
-def get_nc_files_from_directory(directory):
-
-    if not os.path.isdir(directory):
-        raise ValueError(f"Invalid directory: {directory}")
-
-    return [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-
-def check_if_Daily_or_Monthly(directory):
-    """
-    Check if all files in a directory contain either 'Daily' or 'Monthly' in their names.
-
-    Args:
-        directory (str): Path to the directory.
-
-    Returns:
-        str: "Daily" if all files contain "Daily", "Monthly" if all files contain "Monthly",
-             False if there is a mix or neither.
-    """
-
-    files = get_nc_files_from_directory(directory)
-    
-    if not files:
-        print("No files found in the directory.")
-        return False
-
-    contains_daily = all("Daily" in f for f in files)
-    contains_monthly = all("Monthly" in f for f in files)
-
-    if contains_daily:
-        return "Daily"
-    elif contains_monthly:
-        return "Monthly"
-    else:
-        return False  # Mixed or neither
-
 def validate_path(directory_or_full_path, file_name=""):
+    """ Take in a directory or full path and a file name. Check if the path leads to a .nc file. Return the full path. """
+    
     if directory_or_full_path == "":
         raise ValueError("The first parameter in load_mesh needs to be a directory or an .nc file")
     
@@ -81,7 +48,7 @@ def validate_path(directory_or_full_path, file_name=""):
         raise FileNotFoundError(f"File not found: {full_path}")
 
     return full_path
-    
+
 #######################
 #    LOADING FILES    #
 #######################
@@ -105,35 +72,73 @@ def load_mesh(path_to_nc_file, mesh_file_name="", print_read_statement=True):
 def load_data(path_to_nc_file, output_file_name="", print_read_statement=True):
     """ Load the data from an .nc output file. """
 
-    #path_2_use = perlmutterpath2 + outputFileName
-    
-    # if not os.path.exists(path_to_nc_file):  # Check if file exists
-    #     raise FileNotFoundError(f"File not found: {path_to_nc_file}")
-    
-    if print_read_statement:
-        print('======= Read Output: ', path_to_nc_file)
-
     #TODO ADD A CHECK FOR ACCIDENTALLY HAVING SOMETHING OTHER THAN A STRING FOR THE 2ND PARAMETER
     
-    return netCDF4.Dataset(path_to_nc_file + output_file_name)
+    full_path = validate_path(path_to_nc_file, output_file_name)
+    
+    if print_read_statement:
+        print('======= Read Output: ', full_path)
 
-def load_all(path_to_nc_file, mesh_file_name, output_file_name):
-    """ Load the mesh and data to plot. """
+    return netCDF4.Dataset(full_path)
 
-    files = get_nc_files_from_directory(path_to_nc_file)
+#########################
+#    FILE NAME UTILS    #
+#########################
 
-    if not files:
-        print("No .nc files found in the directory.")
-        raise FileNotFoundError(f"File not found: {path_to_nc_file}")
+def get_date_string_from_file_name(path_to_nc_file):
+    """Checks if a string is in the format YYYY-MM-DD.
+    Assumes files are named with the format *YYYY-MM-DD.nc
+    """
+    date_string = path_to_nc_file[-13:-3]
+    print(date_string)
 
-    latCell, lonCell    = load_mesh(path_to_nc_file, mesh_file_name)
-    output              = load_data(path_to_nc_file, output_file_name) # TODO MAKE THIS DYNAMIC
-    #days                = getNumberOfDays(output, keyVariableToPlot=VARIABLETOPLOT)
+    try:
+        datetime.strptime(date_string, "%Y-%m-%d")
+        return date_string
+    except ValueError:
+        return None
 
-    # TODO: For the netCDF make this not hard coded
-    days                = 1
+def is_valid_ymd(date_string):
+    """
+    Checks if a string is in the format YYYY-MM-DD and represents a valid date.
 
-    return latCell, lonCell, output, days
+    Args:
+        date_string: The string to check.
+
+    Returns:
+        True if the string is a valid date in YYYY-MM-DD format, False otherwise.
+    """
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_string):
+        return False
+    try:
+        datetime.datetime.strptime(date_string, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+def get_year_from_file_name(path_to_nc_file):
+    """Returns a string with the year.
+    Assumes files are named with the format *YYYY-MM-DD.nc
+    """
+    date_string = get_date_string_from_file_name(path_to_nc_file)
+
+    try:
+        is_valid_ymd(date_string)
+        return date_string[0:4]
+    except ValueError:
+        return None
+    
+def get_year_from_date_string(date_string):
+    """Get the year. Assumes the format *YYYY-MM-DD.nc"""
+    return date_string[0:4]
+
+def get_month_from_date_string(date_string):
+    """Get the month. Assumes the format *YYYY-MM-DD.nc"""
+    return date_string[5:7]
+
+def get_day_from_date_string(date_string):
+    """Get the day. Assumes the format *YYYY-MM-DD.nc"""
+    return date_string[8:10]
 
 #######################
 #   TIME VARIABLES    #
@@ -147,8 +152,7 @@ def get_number_of_days(output, keyVariableToPlot=VARIABLETOPLOT):
     print("Count of days is ", count.shape)
 
     variableForAllDays = output.variables[keyVariableToPlot][:]
-
-    print("Shape is", variableForAllDays.shape)
+    print("Shape of variable to plot is", variableForAllDays.shape)
 
     return variableForAllDays.shape[0]
 

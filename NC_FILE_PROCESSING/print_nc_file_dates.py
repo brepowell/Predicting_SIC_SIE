@@ -1,5 +1,13 @@
 import os
 import argparse
+import sys
+import os
+
+# Get the parent directory and add it to sys.path
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, parent_dir)
+
+# Now you can import the modules
 from nc_utility_functions import *
 from config import *
 
