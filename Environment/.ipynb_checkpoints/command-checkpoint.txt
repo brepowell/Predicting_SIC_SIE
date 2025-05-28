@@ -1,0 +1,2 @@
+nersc$ python -m ipykernel install \
+    --user --name sic_sie_env --display-name SIC_SIE_ENV

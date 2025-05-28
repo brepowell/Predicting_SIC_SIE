@@ -1,0 +1,14 @@
+name: sic_sie_env
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - pandas
+  - xarray
+  - matplotlib
+  - pytorch
+  - torchvision
+  - torchaudio
