@@ -3,6 +3,7 @@ from config import *
 import netCDF4                      # For opening .nc files for numpy
 import numpy as np
 from datetime import datetime, timedelta 
+from sklearn.cluster import KMeans
 
 import os
 
@@ -235,6 +236,41 @@ def get_Lat_Lon(output):
     lonCell = output.variables[LONGITUDEVARIABLE][:1]
     lonCell = lonCell.ravel()
     return latCell, lonCell
+
+
+def cluster_patches(latCell, lonCell):
+    """ Take lat and lon values from only 50 degrees north and cluster them into patches of 49
+    cells per patch for 727 patches and 35623 mesh cells. Returns an array of all 465,044 mesh cells
+    where -1 indicates that there was no cluster. """
+    
+    # --- 1.  Mask for ≥50 ° N ------------------------------------
+    mask = latCell > 50                     # Boolean array, True for 35623 rows
+    lat_f = latCell[mask]
+    lon_f = lonCell[mask]
+    print("Non-zeroes", np.count_nonzero(mask))
+    
+    # --- 2.  Stack into (n_samples, 2) & run K-means --------------
+    coords = np.column_stack((lat_f, lon_f))  # shape (35623, 2)
+    
+    k = 727                                   # 35623 ÷ 49
+    kmeans = KMeans(
+        n_clusters=k,
+        init="k-means++",     # default, good for speed / accuracy
+        n_init="auto",        # auto-scales n_init in recent scikit-learn versions
+        random_state=42,      # make runs reproducible
+        algorithm="elkan"     # faster for low-dimension dense data
+    ).fit(coords)
+    
+    centroids = kmeans.cluster_centers_       # array shape (727, 2)
+    labels_f = kmeans.labels_                 # length 35623
+    
+    # --- 3.  Re-insert labels into full-length array ---------------
+    # Make an array filled with -1's in the shape of latCell
+    labels_full = np.full(latCell.shape, -1, dtype=int)  # –1 marks “not clustered”
+    labels_full[mask] = labels_f # Populate the array with the labels from the clustering
+
+    return labels_full
+
 
 #######################
 #  REDUCE DIMENSIONS  #

@@ -422,6 +422,62 @@ def map_all_lats_lons_binned_by_index(fig, latCell, lonCell, northMap, southMap,
 
     return tuple(scatters)
 
+
+def map_patches_by_index(fig, latCell, lonCell, patch_indices, hemisphereMap, dot_size=DOT_SIZE):
+    """ Map points with a gradient from white to dark, scaled across all cells. """
+
+    # Create global index array based on all cells
+    all_indices = np.arange(len(latCell))
+
+    # Normalize over the full range
+    norm = mpl.colors.Normalize(vmin=0, vmax=patch_indices.max())
+
+    # Create custom colormap
+    cmap = LinearSegmentedColormap.from_list("white_to_dark", ["white", "navy"])
+
+    # Filter the points to plot
+    mask = latCell > LAT_LIMIT
+    filtered_lat = latCell[mask]
+    filtered_lon = lonCell[mask]
+    filtered_indices = all_indices[mask]  # These are the indices to be color-mapped
+
+    # Adjust layout
+    fig.subplots_adjust(bottom=0.25, top=0.85, left=0.04, right=0.95, wspace=0.02)
+    hemisphereMap.set_extent([MINLONGITUDE, MAXLONGITUDE, LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
+    add_map_features(hemisphereMap)
+    hemisphereMap.set_boundary(make_circle(), transform=hemisphereMap.transAxes)
+
+    # Plot only the filtered points, but use color values from the full gradient
+    sc = hemisphereMap.scatter(filtered_lon, filtered_lat,
+                               s=dot_size,
+                               c=filtered_indices,
+                               cmap=cmap,
+                               norm=norm,
+                               transform=ccrs.PlateCarree())
+
+    # Colorbar setup (based on the full index range)
+    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array(all_indices)
+    
+    # Create colorbar for the whole figure 
+    cbar = fig.colorbar(sm, ax=[hemisphereMap],
+                        orientation='horizontal',  # or 'vertical'
+                        fraction=0.05,  # size of the colorbar
+                        pad=0.08,       # space between colorbar and subplots
+                        shrink=0.8,     # shrink the bar to fit nicely
+                        aspect=30,      # width of colorbar
+                        location='bottom',  # try 'bottom' or 'right'
+                        label='Index (all cells)')
+        
+    hemisphereMap.set_title("Mesh in a gradient")
+    hemisphereMap.axis('off')
+    plt.suptitle("Mesh", size="x-large", fontweight="bold")
+    plt.savefig("mesh_color.png")
+    plt.close(fig)
+
+    return sc
+
+
 def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, variableToPlot1D, mapImageFileName, 
                                   colorBarOn=COLORBARON, grid=GRIDON,
                                   oceanFeature=OCEANFEATURE, landFeature=LANDFEATURE, 
