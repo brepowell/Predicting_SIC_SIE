@@ -493,7 +493,7 @@ def map_patches_by_index_binned(fig,
     num_bins = patch_id.max() + 1
     
     # Generate colors
-    base_cmap = get_cmap("flag")  # More variety
+    base_cmap = get_cmap("flag")  # Easier to see stripes
     colors = [base_cmap(i / num_bins) for i in range(num_bins)]
     
     # Assign color per bin
