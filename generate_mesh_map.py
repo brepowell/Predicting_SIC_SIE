@@ -28,11 +28,26 @@ def main():
     map_all_lats_lons_binned_by_index(fig, latCell, lonCell, northMap, southMap, plateCar, orthoMap, robinMap, rotPolMap) 
     '''
 
-    patches = cluster_patches(latCell, lonCell)
+    # Two different patching techniques
+    #patches = cluster_patches(latCell, lonCell)
+    patches = get_rows_of_patches(latCell, lonCell)
+
+    # mask = latCell > 50
+    # fig, northMap = generate_axes_north_pole()
+    # map_patches_by_index(fig, latCell, lonCell, patches, northMap)
+    
+    # distinct_count = len(set(patches[mask]))
+    # print("number of patches:" , distinct_count) # Output: 727
+
+    # from collections import Counter
+    
+    # counts = Counter(patches[mask])
+    # print(counts.most_common()[-1]) #gives the tuple with the smallest count.
+    # print(counts.most_common(1)[0]) #gives the tuple with the largest count.
+
     fig, northMap = generate_axes_north_pole()
-    map_patches_by_index(fig, latCell, lonCell, patches, northMap)
-
-
+    map_patches_by_index_binned(fig, latCell, lonCell, patches, northMap)
+    
     
 if __name__ == "__main__":
     main()

@@ -436,10 +436,7 @@ def map_patches_by_index(fig, latCell, lonCell, patch_indices, hemisphereMap, do
     cmap = LinearSegmentedColormap.from_list("white_to_dark", ["white", "navy"])
 
     # Filter the points to plot
-    mask = latCell > LAT_LIMIT
-    filtered_lat = latCell[mask]
-    filtered_lon = lonCell[mask]
-    filtered_indices = all_indices[mask]  # These are the indices to be color-mapped
+    mask = latCell > 50
 
     # Adjust layout
     fig.subplots_adjust(bottom=0.25, top=0.85, left=0.04, right=0.95, wspace=0.02)
@@ -448,9 +445,9 @@ def map_patches_by_index(fig, latCell, lonCell, patch_indices, hemisphereMap, do
     hemisphereMap.set_boundary(make_circle(), transform=hemisphereMap.transAxes)
 
     # Plot only the filtered points, but use color values from the full gradient
-    sc = hemisphereMap.scatter(filtered_lon, filtered_lat,
+    sc = hemisphereMap.scatter(lonCell[mask], latCell[mask],
                                s=dot_size,
-                               c=filtered_indices,
+                               c=patch_indices[mask],
                                cmap=cmap,
                                norm=norm,
                                transform=ccrs.PlateCarree())
@@ -469,15 +466,82 @@ def map_patches_by_index(fig, latCell, lonCell, patch_indices, hemisphereMap, do
                         location='bottom',  # try 'bottom' or 'right'
                         label='Index (all cells)')
         
-    hemisphereMap.set_title("Mesh in a gradient")
+    hemisphereMap.set_title("Mesh patches in a gradient")
     hemisphereMap.axis('off')
     plt.suptitle("Mesh", size="x-large", fontweight="bold")
-    plt.savefig("mesh_color.png")
+    plt.savefig("mesh_patches.png")
     plt.close(fig)
 
     return sc
 
+PATCH_SIZE = 49          # 49 cells per patch
 
+def map_patches_by_index_binned(fig,
+                                latCell, lonCell,            # 1-D numpy arrays
+                                patch_indices,               # 0 … len(latCell)-1
+                                hemisphereMap,
+                                dot_size=DOT_SIZE):
+    """Plot every 49-cell patch in its own colour (727 patches total)."""
+
+    # --------- choose the cells you really want to see ----------
+    mask = latCell > LAT_LIMIT          # keep everything else the same
+
+    # Recompute patch_id for valid cells only
+    patch_id = patch_indices[mask]
+    
+    # Determine number of unique patches
+    num_bins = patch_id.max() + 1
+    
+    # Generate colors
+    base_cmap = get_cmap("flag")  # More variety
+    colors = [base_cmap(i / num_bins) for i in range(num_bins)]
+    
+    # Assign color per bin
+    bin_indices = np.digitize(patch_id, bins=np.arange(num_bins+1)) - 1
+    scatter_colors = [colors[i] for i in bin_indices]
+    cmap = ListedColormap(colors)
+
+    # --------- cartopy housekeeping ----------------------------
+    fig.subplots_adjust(bottom=0.07, top=0.85,
+                        left=0.04, right=0.95,
+                        wspace=0.02, hspace=0.12)
+
+    hemisphereMap.set_extent([MINLONGITUDE, MAXLONGITUDE,
+                              LAT_LIMIT, NORTHPOLE],
+                              ccrs.PlateCarree())
+    add_map_features(hemisphereMap)
+    hemisphereMap.set_boundary(make_circle(), transform=hemisphereMap.transAxes)
+    add_polar_labels(hemisphereMap, hemisphere='north')
+
+    # --------- scatter plot ------------------------------------
+    sc = hemisphereMap.scatter(lonCell[mask], latCell[mask],
+                               s=dot_size,
+                               c=scatter_colors,           # <-- patch IDs drive colour
+                               cmap=cmap,
+                               transform=ccrs.PlateCarree())
+
+    # --------- (optional) colour-bar ----------------------------
+    sm = mpl.cm.ScalarMappable(cmap=cmap)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=[hemisphereMap],
+                        orientation='horizontal',
+                        fraction=0.05, pad=0.08,
+                        shrink=0.8, aspect=30,
+                        location='bottom')
+    cbar.set_label('Patch ID (49 cells each)')
+    # 727 ticks are illegible – remove them:
+    cbar.set_ticks([])
+
+    # --------- titles & save -----------------------------------
+    hemisphereMap.set_title("Mesh – 727 patches (49 cells each)")
+    hemisphereMap.axis('off')
+    plt.suptitle("Mesh by Patch", size="x-large", fontweight="bold")
+    plt.savefig("mesh_patches_binned.png")
+    plt.close(fig)
+
+    return sc
+
+    
 def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, variableToPlot1D, mapImageFileName, 
                                   colorBarOn=COLORBARON, grid=GRIDON,
                                   oceanFeature=OCEANFEATURE, landFeature=LANDFEATURE, 

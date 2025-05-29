@@ -272,6 +272,24 @@ def cluster_patches(latCell, lonCell):
     return labels_full
 
 
+def get_rows_of_patches(latCell, lonCell):
+    
+    # --- 1.  Mask for ≥50 ° N ------------------------------------
+    indices = np.where(latCell > LAT_LIMIT)
+    print("Non-zeroes", np.count_nonzero(indices[0]))
+
+    labels_full = np.full(latCell.shape, -1, dtype=int)
+
+    bucket = 0
+
+    for i, index in enumerate(indices[0]):
+        labels_full[index] = bucket
+        if (i+1) % 49 == 0 and i > 0:
+            bucket += 1
+
+    return labels_full
+    
+    
 #######################
 #  REDUCE DIMENSIONS  #
 #######################
