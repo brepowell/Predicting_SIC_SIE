@@ -4,6 +4,11 @@ import netCDF4                      # For opening .nc files for numpy
 import numpy as np
 from datetime import datetime, timedelta 
 from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN
+from sklearn.neighbors import NearestNeighbors
+import collections
+
+import matplotlib.pyplot as plt
 
 import os
 
@@ -245,8 +250,8 @@ def cluster_patches(latCell, lonCell):
     
     # --- 1.  Mask for ≥50 ° N ------------------------------------
     mask = latCell > 50                     # Boolean array, True for 35623 rows
-    lat_f = latCell[mask]
-    lon_f = lonCell[mask]
+    lat_f = np.radians(latCell[mask])
+    lon_f = np.radians(lonCell[mask])
     print("Non-zeroes", np.count_nonzero(mask))
     
     # --- 2.  Stack into (n_samples, 2) & run K-means --------------
@@ -262,13 +267,24 @@ def cluster_patches(latCell, lonCell):
     ).fit(coords)
     
     centroids = kmeans.cluster_centers_       # array shape (727, 2)
+    print("centroids", centroids.shape)
     labels_f = kmeans.labels_                 # length 35623
+    print("labels", len(labels_f))
     
     # --- 3.  Re-insert labels into full-length array ---------------
     # Make an array filled with -1's in the shape of latCell
     labels_full = np.full(latCell.shape, -1, dtype=int)  # –1 marks “not clustered”
     labels_full[mask] = labels_f # Populate the array with the labels from the clustering
 
+    print("Cluster sizes:", collections.Counter(labels_full[mask]))
+    
+    #plt.hist(labels_full[mask])
+    counts, bins = np.histogram(labels_f)
+    #plt.stairs(counts, bins)
+    plt.hist(bins[:-1], bins, weights=counts)
+    plt.savefig("histogram_kmeans_patches.png")
+    plt.close()
+    
     return labels_full
 
 
@@ -287,8 +303,117 @@ def get_rows_of_patches(latCell, lonCell):
         if (i+1) % 49 == 0 and i > 0:
             bucket += 1
 
-    return labels_full
+    print("Cluster sizes:", collections.Counter(labels_full[indices]))
     
+    plt.hist(labels_full[indices])
+    plt.savefig("histogram_patch_rows.png")
+    plt.close()
+    
+    return labels_full
+
+def get_clusters_dbscan(latCell, lonCell):
+
+    # --- 1.  Mask for ≥50 ° N ------------------------------------
+    mask = latCell > 50                     # Boolean array, True for 35623 rows
+    lat_f = np.radians(latCell[mask])
+    lon_f = np.radians(lonCell[mask])
+    print("Non-zeroes", np.count_nonzero(mask)) # prints 35623
+    
+    # --- 2.  Stack into (n_samples, 2) & run K-means --------------
+    coords = np.column_stack((lat_f, lon_f)) # shape (35623, 2)
+    print("Shape of coords", coords.shape)
+
+    # make an elbow plot to see the best value for eps
+    
+    neighbors = NearestNeighbors(n_neighbors=49, algorithm='ball_tree', metric='haversine')
+    neighbors_fit = neighbors.fit(coords)
+    distances, indices = neighbors_fit.kneighbors(coords)
+
+    distances = np.sort(distances, axis=0)
+    distances = distances[:, 48]  # index 48 = 49th nearest
+    plt.plot(distances)
+    plt.savefig("elbow_plot.png")
+    plt.close()
+
+    # The elbow plot has an elbow around 0.022
+    
+    # DBSCAN parameters
+    
+    eps = 0.022  # Epsilon (radius)
+    min_samples = 20  # MinPts (minimum points within the radius)
+
+    # Perform DBSCAN clustering
+    dbscan = DBSCAN(eps=eps, min_samples=min_samples, algorithm='ball_tree', metric='haversine')
+    dbscan.fit(coords)
+
+    # Get cluster labels
+    labels = dbscan.labels_
+    n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+    n_noise = list(labels).count(-1)
+
+    print("Estimated number of clusters:", n_clusters)
+    print("Estimated number of noise points:", n_noise)
+    print("Cluster sizes:", collections.Counter(labels))
+    
+    # --- 3.  Re-insert labels into full-length array ---------------
+    # Make an array filled with -1's in the shape of latCell
+    labels_full = np.full(latCell.shape, -1, dtype=int)  # –1 marks “not clustered”
+    labels_full[mask] = labels # Populate the array with the labels from the clustering
+
+    print(len(labels_full[mask]))
+
+    plt.hist(labels_full[mask])
+    plt.savefig("histogram_dbscan_patches.png")
+    plt.close()
+
+    return labels_full
+
+def get_clusters_kmeans_constrained(latCell, lonCell):
+    """
+    This method is special -- I did not want to mix it up with my regular environment, 
+    so I'm running it in its own environment and then saving the results to use with the main environment.
+    This algorithm takes a long time. Run it as a batch job in the future!
+    
+    conda create -n env_special_kmeans
+    conda activate env_special_kmeans
+    conda install pip
+    conda install netCDF4
+    conda install scikit-learn
+    
+    pip install k_means_constrained
+    python cluster_k_means_constrained.py
+
+    """
+
+    # --- 1.  Mask for ≥50 ° N ------------------------------------
+    mask = latCell > 50                     # Boolean array, True for 35623 rows
+    lat_f = np.radians(latCell[mask])
+    lon_f = np.radians(lonCell[mask])
+    print("Non-zeroes", np.count_nonzero(mask))
+    
+    # --- 2.  Stack into (n_samples, 2) & run K-means --------------
+    coords = np.column_stack((lat_f, lon_f))  # shape (35623, 2)
+
+    from k_means_constrained import KMeansConstrained
+    
+    kmeans = KMeansConstrained(
+        n_clusters=727,
+        size_min=49,
+        size_max=49
+    ).fit(coords)
+
+    # Save labels to a file
+    labels_f = kmeans.labels_
+    print("labels", len(labels_f))
+    np.save("patch_labels.npy", labels_f)
+    print("== saved patches ==")
+
+    print("Cluster sizes:", collections.Counter(labels_f))
+    counts, bins = np.histogram(labels_f)
+    plt.hist(bins[:-1], bins, weights=counts)
+          
+    plt.savefig("histogram_kmeans_constrained_patches.png")
+    plt.close()
     
 #######################
 #  REDUCE DIMENSIONS  #

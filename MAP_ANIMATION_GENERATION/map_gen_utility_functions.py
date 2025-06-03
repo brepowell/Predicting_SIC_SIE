@@ -8,6 +8,7 @@
 # Use the config.py file to specify max latitude, max longitude, file paths, etc.
 # Ensure that you are looking for a variable that exists in the output file
 
+import os
 import numpy as np
 
 import matplotlib as mpl
@@ -541,7 +542,6 @@ def map_patches_by_index_binned(fig,
 
     return sc
 
-    
 def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, variableToPlot1D, mapImageFileName, 
                                   colorBarOn=COLORBARON, grid=GRIDON,
                                   oceanFeature=OCEANFEATURE, landFeature=LANDFEATURE, 

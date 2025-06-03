@@ -15,7 +15,7 @@ from perlmutterpath import *
 VARIABLETOPLOT     = "timeDaily_avg_iceAreaCell"   # The variable to plot from the E3SM data
 VARIABLETOPLOTSHORTNAME = "Daily SIC"
 
-print("Plotting this variable: ", VARIABLETOPLOT)
+#print("Plotting this variable: ", VARIABLETOPLOT)
 
 #VARIABLETOPLOT      = "freeboard"                   # The variable to plot from the satellite data
 #VARIABLETOPLOT      = "samplemf" # make sure to set VMAX
