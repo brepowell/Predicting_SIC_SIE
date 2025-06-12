@@ -3,9 +3,9 @@ from config import *
 import netCDF4                      # For opening .nc files for numpy
 import numpy as np
 from datetime import datetime, timedelta 
-from sklearn.cluster import KMeans
-from sklearn.cluster import DBSCAN
-from sklearn.neighbors import NearestNeighbors
+# from sklearn.cluster import KMeans
+# from sklearn.cluster import DBSCAN
+# from sklearn.neighbors import NearestNeighbors
 import collections
 
 import matplotlib.pyplot as plt
@@ -102,7 +102,8 @@ def get_date_string_from_file_name(path_to_nc_file):
         datetime.strptime(date_string, "%Y-%m-%d")
         return date_string
     except ValueError:
-        return None
+        raise ValueError(f"Invalid date format in file name: {path_to_nc_file}")
+
 
 def is_valid_ymd(date_string):
     """
@@ -242,6 +243,35 @@ def get_Lat_Lon(output):
     lonCell = lonCell.ravel()
     return latCell, lonCell
 
+#######################
+#  REDUCE DIMENSIONS  #
+#######################
+
+def reduce_to_one_dimension(output, keyVariableToPlot=VARIABLETOPLOT, dayNumber=0):
+    """ Reduce the variable to one day's worth of data so we can plot 
+    using each index per cell. The indices for each cell of the 
+    variableToPlot1Day array coincide with the indices 
+    of the latCell and lonCell. """
+    
+    variableForAllDays = output.variables[keyVariableToPlot][:]
+
+    # Check if the variable is one-dimensional
+    if variableForAllDays.ndim != 1:
+        return variableForAllDays[dayNumber,:]
+    else:
+        return variableForAllDays[:]
+
+###################
+#  DOWNSAMPLING   #
+###################
+
+def downsample_data(latCell, lonCell, timeCell, variableToPlot1Day, factor=DEFAULT_DOWNSAMPLE_FACTOR):
+    """ Downsample the data arrays by the given factor. """
+    return latCell[::factor], lonCell[::factor], timeCell[::factor], variableToPlot1Day[::factor]
+
+def downsample_data(variable, factor=DEFAULT_DOWNSAMPLE_FACTOR):
+    """ Downsample the data arrays by the given factor. """
+    return variable[::factor]
 
 def cluster_patches(latCell, lonCell):
     """ Take lat and lon values from only 50 degrees north and cluster them into patches of 49
@@ -284,6 +314,62 @@ def cluster_patches(latCell, lonCell):
     plt.hist(bins[:-1], bins, weights=counts)
     plt.savefig("histogram_kmeans_patches.png")
     plt.close()
+    
+    return labels_full
+
+def cluster_patches_loop(latCell, lonCell):
+    """ This experiment did not work -- after 49 iterations, it no longer found good matches. """
+
+    # Initial Conditions
+    mask = latCell > 50  # Boolean array, True for 35623 rows
+    labels_full = np.full(latCell.shape, -1, dtype=int)  # –1 = unclustered
+    
+    n_clusters = 727
+    cells_per_cluster = 49
+    
+    # Repeat
+    for iteration in range(200):
+        print(f"--- CLUSTERING PART {iteration} ---")
+    
+        # Filter the coords to re-cluster only unassigned cells
+        lat_radians = np.radians(latCell[mask])
+        lon_radians = np.radians(lonCell[mask])
+        coords = np.column_stack((lat_radians, lon_radians))
+    
+        if len(coords) < cells_per_cluster:
+            print("Too few cells left to cluster. Stopping.")
+            break
+    
+        n_clusters = len(coords) // cells_per_cluster
+    
+        kmeans = KMeans(
+            n_clusters=n_clusters,
+            init="k-means++",
+            n_init="auto",
+            random_state=42,
+            algorithm="elkan"
+        ).fit(coords)
+    
+        labels_f = kmeans.labels_
+    
+        # Count how many points in each cluster
+        counts = np.bincount(labels_f, minlength=n_clusters)
+        good_patch_ids = np.where(counts == cells_per_cluster)[0]
+        print(f"Good patches found: {len(good_patch_ids)}")
+    
+        # Find which points belong to good patches
+        is_good_point = np.isin(labels_f, good_patch_ids)
+        good_indices_in_masked = np.where(mask)[0][is_good_point]  # these are indices in latCell, lonCell
+    
+        # Assign patch IDs to full label array
+        for i, patch_id in enumerate(good_patch_ids):
+            point_indices = np.where(labels_f == patch_id)[0]
+            real_indices = np.where(mask)[0][point_indices]
+            labels_full[real_indices] = patch_id
+    
+        # Update mask to exclude good patches
+        mask[good_indices_in_masked] = False
+        print(f"Remaining points to cluster: {np.count_nonzero(mask)}")
     
     return labels_full
 
@@ -415,32 +501,3 @@ def get_clusters_kmeans_constrained(latCell, lonCell):
     plt.savefig("histogram_kmeans_constrained_patches.png")
     plt.close()
     
-#######################
-#  REDUCE DIMENSIONS  #
-#######################
-
-def reduce_to_one_dimension(output, keyVariableToPlot=VARIABLETOPLOT, dayNumber=0):
-    """ Reduce the variable to one day's worth of data so we can plot 
-    using each index per cell. The indices for each cell of the 
-    variableToPlot1Day array coincide with the indices 
-    of the latCell and lonCell. """
-    
-    variableForAllDays = output.variables[keyVariableToPlot][:]
-
-    # Check if the variable is one-dimensional
-    if variableForAllDays.ndim != 1:
-        return variableForAllDays[dayNumber,:]
-    else:
-        return variableForAllDays[:]
-
-###################
-#  DOWNSAMPLING   #
-###################
-
-def downsample_data(latCell, lonCell, timeCell, variableToPlot1Day, factor=DEFAULT_DOWNSAMPLE_FACTOR):
-    """ Downsample the data arrays by the given factor. """
-    return latCell[::factor], lonCell[::factor], timeCell[::factor], variableToPlot1Day[::factor]
-
-def downsample_data(variable, factor=DEFAULT_DOWNSAMPLE_FACTOR):
-    """ Downsample the data arrays by the given factor. """
-    return variable[::factor]

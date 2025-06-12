@@ -30,20 +30,20 @@ def main():
     '''
 
     # Two different patching techniques
-    #patches = cluster_patches(latCell, lonCell) # Patching in clusters, like k-means
+    patches = cluster_patches(latCell, lonCell) # Patching in clusters, like k-means
     #patches = get_rows_of_patches(latCell, lonCell) # Patching in rows or stripes
     #patches = get_clusters_dbscan(latCell, lonCell) # Patching from dbscan
-    patches = get_clusters_kmeans_constrained(latCell, lonCell)
+    #patches = get_clusters_kmeans_constrained(latCell, lonCell)
 
     # Load the labels
-    labels = np.load("patch_labels.npy")
+    #labels = np.load("patch_labels.npy")
     # Or if using CSV:
     # import pandas as pd
     # labels = pd.read_csv("cluster_labels.csv", header=None).values.flatten()
     
     # Insert into full label array
-    patches = np.full(latCell.shape, -1, dtype=int)
-    patches[latCell > 50] = labels
+    #patches = np.full(latCell.shape, -1, dtype=int)
+    #patches[latCell > 50] = labels
 
     # mask = latCell > 50
     # fig, northMap = generate_axes_north_pole()
@@ -53,8 +53,8 @@ def main():
     # print("number of patches:" , distinct_count) # Output: 727
 
     # Check the number of cells per patch
-    from collections import Counter
-    counts = Counter(patches[mask])
+    #from collections import Counter
+    #counts = Counter(patches[mask])
 
     # What patch has the largest number of cells or least number of cells?
     # print(counts.most_common()[-1]) #gives the tuple with the smallest count.

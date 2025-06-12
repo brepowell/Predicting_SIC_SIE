@@ -1,2 +1,16 @@
-nersc$ python -m ipykernel install \
-    --user --name sic_sie_env --display-name SIC_SIE_ENV
+# DELETE A BAD ENVIRONMENT
+
+module load python
+conda deactivate
+conda remove --name sic_sie_env --all -y
+
+# CREATE AN ENVIRONMENT
+conda env create -f sic_sie_env.yml
+conda activate sic_sie_env
+
+# CREATE A KERNEL
+python -m ipykernel install --user --name sic_sie_env --display-name "Sea Ice Classifier"
+
+
+module load python
+conda list ipympl
