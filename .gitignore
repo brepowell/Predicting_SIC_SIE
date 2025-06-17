@@ -1,2 +1,3 @@
-NC_FILE_PROCESSING/perlmutterpath.py
-*/.ipynb_checkpoints/
+perlmutterpath.py
+.ipynb_checkpoints/
+__pycache__/
