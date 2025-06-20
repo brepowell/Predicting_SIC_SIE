@@ -1,8 +1,9 @@
-from NC_FILE_PROCESSING.nc_utility_functions import *
-#from MAP_ANIMATION_GENERATION.map_gen_utility_functions import *
-#from MAP_ANIMATION_GENERATION.map_label_utility_functions import *
-#from MAP_ANIMATION_GENERATION.map_animation_utility_functions import *
+from NC_FILE_PROCESSING.patchify_utils import *
+from MAP_ANIMATION_GENERATION.map_gen_utility_functions import *
+from MAP_ANIMATION_GENERATION.map_label_utility_functions import *
+from MAP_ANIMATION_GENERATION.map_animation_utility_functions import * 
 from config import *
+
 
 def main():
     
@@ -16,7 +17,6 @@ def main():
     fig, northMap = generate_axes_north_pole()
     map_lats_lons_one_color(fig, latCell, lonCell, northMap)
 
-    
     fig, northMap = generate_axes_north_pole() 
     map_lats_lons_gradient_by_index(fig, latCell, lonCell, northMap)
 
@@ -30,10 +30,12 @@ def main():
     '''
 
     # Two different patching techniques
-    patches = cluster_patches(latCell, lonCell) # Patching in clusters, like k-means
+    #patches = cluster_patches_kmeans(latCell, lonCell) # Patching in clusters, like k-means
     #patches = get_rows_of_patches(latCell, lonCell) # Patching in rows or stripes
-    #patches = get_clusters_dbscan(latCell, lonCell) # Patching from dbscan
-    #patches = get_clusters_kmeans_constrained(latCell, lonCell)
+    #patches = cluster_patches_loop(latCell, lonCell)
+    #patches = cluster_patches_kmeans_padded(latCell, lonCell)
+    #patches = compute_knn_patches_with_labels(latCell, lonCell, k=48, n_patches=727, seed=42, lat_threshold=50)
+    patches = compute_disjoint_knn_patches(latCell, lonCell, k=49, n_patches=727, seed=42, lat_threshold=50)
 
     # Load the labels
     #labels = np.load("patch_labels.npy")
@@ -48,20 +50,9 @@ def main():
     # mask = latCell > 50
     # fig, northMap = generate_axes_north_pole()
     # map_patches_by_index(fig, latCell, lonCell, patches, northMap)
-    
-    # distinct_count = len(set(patches[mask]))
-    # print("number of patches:" , distinct_count) # Output: 727
 
-    # Check the number of cells per patch
-    #from collections import Counter
-    #counts = Counter(patches[mask])
-
-    # What patch has the largest number of cells or least number of cells?
-    # print(counts.most_common()[-1]) #gives the tuple with the smallest count.
-    # print(counts.most_common(1)[0]) #gives the tuple with the largest count.
-
-    #fig, northMap = generate_axes_north_pole()
-    #map_patches_by_index_binned(fig, latCell, lonCell, patches, northMap)
+    fig, northMap = generate_axes_north_pole()
+    map_patches_by_index_binned(fig, latCell, lonCell, patches, northMap)
 
     #animate_patch_reveal(latCell, lonCell, patches)
     

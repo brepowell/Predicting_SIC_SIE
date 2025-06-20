@@ -23,46 +23,27 @@ def main():
     # Load the mesh and data to plot.
     latCell, lonCell = load_mesh(perlmutterpathMesh)
 
+    latitudes_to_try = [40,41,42,43,44,45,46,47,48,50,55,60,65,70,75,80,85,89]
+
     print("How many cells would there be if I mask the data down to certain latitudes?")
-    indices = np.where(latCell > 50)
-    cellCount = len(indices[0])
-    print("Cell count when lat_limit is 50 degrees:", cellCount)
-    # result = find_factors_optimized(cellCount)
-    # print(f"The factors of {cellCount} are: {result}")
     
-    # indices = np.where(latCell > 65)
-    # print("Cell count when lat_limit is 65 degrees:", len(indices[0])) 
+    for latitude_limit in latitudes_to_try:
+        indices = np.where(latCell > latitude_limit)
+        cellCount = len(indices[0])
 
-    # indices = np.where(latCell > 80)
-    # print("Cell count when lat_limit is 80 degrees:", len(indices[0]))
-    
-    # indices = np.where(labels_full > -1)
-    # print("how many cells have labels", len(indices[0]))
-
-    # print("max index", labels_full.max())
-
-    # indices = np.where(labels_full == 700)
-    # print("Latitudes in patch 700")
-    # print(latCell[indices])
-    # print("Longitudes in patch 700")
-    # print(lonCell[indices])
-    # print("How many cells are in patch 700", len(indices[0]))
-
-    # print("lat min", latCell[indices].min())
-    # print("lat max", latCell[indices].max())
-    # print("lon min", lonCell[indices].min())
-    # print("lon max", lonCell[indices].max())
-
-    # diameter_latitudes  = np.radians(latCell[indices].max()) - np.radians(latCell[indices].min())
-    # diameter_longitudes = np.radians(lonCell[indices].max()) - np.radians(lonCell[indices].min())
-
-    # print("radius for lats", diameter_latitudes / 2)
-    # print("radius for lons", diameter_longitudes / 2)
-
-    
-    
-
-
+        print("=========================================")
+        print("Lat limit:         ", latitude_limit)
+        print("Cell count:        ", cellCount)
+        result = find_factors_optimized(cellCount)
+        print(f"The factors of {cellCount} are: {result}")
+        print("Is perfect square? ", is_perfect_square(cellCount))
+        print("Divisible by 8       ", 8 in result)
+        print("Divisible by 16      ", 16 in result)
+        print("Divisible by 128     ", 128 in result)
+        print("Divisible by 256     ", 256 in result)
+        print("Divisible by 640     ", 640 in result)
+        print("smallest index", indices[0][0])
+        print("largest index", indices[0][-1])
     
 
 if __name__ == "__main__":
