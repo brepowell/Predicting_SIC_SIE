@@ -35,18 +35,45 @@ def bar_graph_cluster_distribution(labels_full, mask, algorithm = "patches"):
     plt.xlabel("Patch ID's")
     plt.ylabel("Cell Count")
     plt.title("Cells per Patch")
-    plt.savefig(f"{algorithm}.png")
+    plt.savefig(f"distribution_{algorithm}_patches_{distinct_count}.png")
     plt.close()
 
-def compute_disjoint_knn_patches(latCell, lonCell, k=49, n_patches=727, 
-                                  seed=42, lat_threshold=50):
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.neighbors import kneighbors_graph
+
+def compute_agglomerative_patches(latCell, lonCell, lat_threshold=50, n_patches=727, n_neighbors=6):
+
+    mask = latCell > lat_threshold
+    coords = latlon_to_xyz(latCell[mask], lonCell[mask])
+    
+    # Create spatial connectivity graph
+    connectivity = kneighbors_graph(coords, n_neighbors=n_neighbors, include_self=False)
+    
+    # Cluster
+    agg = AgglomerativeClustering(
+        n_clusters=n_patches,
+        connectivity=connectivity,
+        linkage='ward'
+    )
+    labels = agg.fit_predict(coords)
+    
+    # Insert back into full array
+    labels_full = np.full(latCell.shape, -1, dtype=int)
+    labels_full[mask] = labels
+
+    bar_graph_cluster_distribution(labels_full, mask, algorithm="agglomerative")
+
+    return labels_full
+    
+def compute_disjoint_knn_patches(latCell, lonCell, lat_threshold=50, cells_per_patch=49, n_patches=727, 
+                                  seed=42):
     mask = latCell > lat_threshold
     lat_filtered = latCell[mask]
     lon_filtered = lonCell[mask]
     coords_xyz = latlon_to_xyz(lat_filtered, lon_filtered)
     original_indices = np.nonzero(mask)[0]
 
-    knn = NearestNeighbors(n_neighbors=k * 3, algorithm='auto')  # oversample neighbors
+    knn = NearestNeighbors(n_neighbors=cells_per_patch * 3, algorithm='auto')  # oversample neighbors
     knn.fit(coords_xyz)
 
     rng = np.random.default_rng(seed)
@@ -60,7 +87,7 @@ def compute_disjoint_knn_patches(latCell, lonCell, k=49, n_patches=727,
 
         # Select only neighbors not already used
         new_patch = [nid for nid in neighbors if not used[nid]]
-        new_patch = new_patch[:k]  # trim to desired size
+        new_patch = new_patch[:cells_per_patch]  # trim to desired size
 
         # Mark as used and assign label
         for nid in new_patch:
@@ -75,8 +102,8 @@ def compute_disjoint_knn_patches(latCell, lonCell, k=49, n_patches=727,
     return labels_full
 
 
-def compute_knn_patches_with_labels(latCell, lonCell, k=49, n_patches=727, 
-                                    seed=42, lat_threshold=50):
+def compute_knn_patches(latCell, lonCell, lat_threshold=50, cells_per_patch=49, n_patches=727, 
+                                    seed=42):
     # 1. Apply mask
     mask = latCell > lat_threshold
     lat_filtered = latCell[mask]
@@ -85,7 +112,7 @@ def compute_knn_patches_with_labels(latCell, lonCell, k=49, n_patches=727,
     original_indices = np.nonzero(mask)[0]
 
     # 2. Fit kNN
-    knn = NearestNeighbors(n_neighbors=k, algorithm='auto')
+    knn = NearestNeighbors(n_neighbors=cells_per_patch, algorithm='auto')
     knn.fit(coords_xyz)
 
     # 3. Choose patch centers (randomly among valid ones)
@@ -105,142 +132,22 @@ def compute_knn_patches_with_labels(latCell, lonCell, k=49, n_patches=727,
     labels_full = np.full(latCell.shape, -1, dtype=int)
     labels_full[mask] = labels_masked
 
-    patch_indices = np.array(patch_indices)  # (n_patches, k)
+    patch_indices = np.array(patch_indices)  # (n_patches, cells_per_patch)
     print("patch indices: === ", patch_indices)
 
     # 6. Visualize the bar graph
-    bar_graph_cluster_distribution(labels_full, mask, algorithm = "knn_patches")
+    bar_graph_cluster_distribution(labels_full, mask, algorithm = "knn_basic")
 
     #return patch_indices, labels_full
     return labels_full
 
-
-def cluster_patches_kmeans_padded(latCell, lonCell):
-    """  """
-    
-    # --- 1.  Mask for ≥50 ° N ------------------------------------
-    indices = np.where(latCell > 40)              
-    lat_f = np.radians(latCell[indices])
-    lon_f = np.radians(lonCell[indices])
-    
-    print("indices size", indices[0].shape)
-    print("smallest index", indices[0][0])
-    print("largest index", indices[0][-1])
-
-    ideal_cluster_count_k = 640
-    ideal_cells_per_cluster = 64
-    ideal_cell_count = ideal_cluster_count_k * ideal_cells_per_cluster
-
-    cropped_indices = (indices[0][:ideal_cell_count],) + indices[1:]
-    lat_f = np.radians(latCell[cropped_indices])
-    lon_f = np.radians(lonCell[cropped_indices])
-    
-    print("indices size", cropped_indices[0].shape)
-    print("smallest index", cropped_indices[0][0])
-    print("largest index", cropped_indices[0][-1])
-    
-    # --- 2.  Stack into (n_samples, 2) & run K-means --------------
-    coords = np.column_stack((lat_f, lon_f))
-    
-    kmeans = KMeans(
-        n_clusters=ideal_cluster_count_k,
-        init="k-means++",     # default, good for speed / accuracy
-        n_init="auto",        # auto-scales n_init in recent scikit-learn versions
-        random_state=42,      # make runs reproducible
-        algorithm="elkan"     # faster for low-dimension dense data
-    ).fit(coords)
-    
-    centroids = kmeans.cluster_centers_ 
-    print("centroids", centroids.shape)
-    labels_f = kmeans.labels_ 
-    print("labels", len(labels_f))
-    
-    # --- 3.  Re-insert labels into full-length array ---------------
-    # Make an array filled with -1's in the shape of latCell
-    labels_full = np.full(latCell.shape, -1, dtype=int)  # –1 marks “not clustered”
-    labels_full[cropped_indices] = labels_f # Populate the array with the labels from the clustering
-
-    counts = collections.Counter(labels_full[cropped_indices])
-    print("Cluster sizes:", )
-    
-    patch_ids = list(counts.keys())
-    cells_per_patch = list(counts.values())
-
-    print("min size", min(cells_per_patch))
-    print("max size", max(cells_per_patch))
-
-    plt.bar(patch_ids, cells_per_patch)
-    plt.xlabel("Patch ID's")
-    plt.ylabel("Cell Count")
-    plt.title("Cells per Patch")
-    plt.savefig("histogram_kmeans_padded.png")
-    plt.close()
-    
-    return labels_full, centroids
-
-def cluster_patches_loop(latCell, lonCell):
-    """ This experiment did not work -- after 49 iterations, it no longer found good matches. """
-
-    # Initial Conditions
-    mask = latCell > 45  # Boolean array, True for 35623 rows
-    labels_full = np.full(latCell.shape, -1, dtype=int)  # –1 = unclustered
-    
-    n_clusters = 640
-    cells_per_cluster = 64
-    
-    # Repeat
-    for iteration in range(200):
-        print(f"--- CLUSTERING PART {iteration} ---")
-    
-        # Filter the coords to re-cluster only unassigned cells
-        lat_radians = np.radians(latCell[mask])
-        lon_radians = np.radians(lonCell[mask])
-        coords = np.column_stack((lat_radians, lon_radians))
-    
-        if len(coords) < cells_per_cluster:
-            print("Too few cells left to cluster. Stopping.")
-            break
-    
-        n_clusters = len(coords) // cells_per_cluster
-    
-        kmeans = KMeans(
-            n_clusters=n_clusters,
-            init="k-means++",
-            n_init="auto",
-            random_state=42,
-            algorithm="elkan"
-        ).fit(coords)
-    
-        labels_f = kmeans.labels_
-    
-        # Count how many points in each cluster
-        counts = np.bincount(labels_f, minlength=n_clusters)
-        good_patch_ids = np.where(counts == cells_per_cluster)[0]
-        print(f"Good patches found: {len(good_patch_ids)}")
-    
-        # Find which points belong to good patches
-        is_good_point = np.isin(labels_f, good_patch_ids)
-        good_indices_in_masked = np.where(mask)[0][is_good_point]  # these are indices in latCell, lonCell
-    
-        # Assign patch IDs to full label array
-        for i, patch_id in enumerate(good_patch_ids):
-            point_indices = np.where(labels_f == patch_id)[0]
-            real_indices = np.where(mask)[0][point_indices]
-            labels_full[real_indices] = patch_id
-    
-        # Update mask to exclude good patches
-        mask[good_indices_in_masked] = False
-        print(f"Remaining points to cluster: {np.count_nonzero(mask)}")
-    
-    return labels_full
-
-def cluster_patches_kmeans(latCell, lonCell):
+def cluster_patches_kmeans(latCell, lonCell, lat_threshold=50, n_patches = 727, seed=42):
     """ Take lat and lon values from only 50 degrees north and cluster them into patches of 49
     cells per patch for 727 patches and 35623 mesh cells. Returns an array of all 465,044 mesh cells
     where -1 indicates that there was no cluster. """
     
     # --- 1.  Mask for ≥50 ° N ------------------------------------
-    mask = latCell > 50                     # Boolean array, True for 35623 rows
+    mask = latCell > lat_threshold           # Boolean array, True for 35623 rows
     lat_f = np.radians(latCell[mask])
     lon_f = np.radians(lonCell[mask])
     print("Non-zeroes", np.count_nonzero(mask))
@@ -248,12 +155,12 @@ def cluster_patches_kmeans(latCell, lonCell):
     # --- 2.  Stack into (n_samples, 2) & run K-means --------------
     coords = np.column_stack((lat_f, lon_f))  # shape (35623, 2)
     
-    k = 727                                   # 35623 ÷ 49
+                                      # 35623 ÷ 49
     kmeans = KMeans(
-        n_clusters=k,
+        n_clusters=n_patches,
         init="k-means++",     # default, good for speed / accuracy
         n_init="auto",        # auto-scales n_init in recent scikit-learn versions
-        random_state=42,      # make runs reproducible
+        random_state=seed,      # make runs reproducible
         algorithm="elkan"     # faster for low-dimension dense data
     ).fit(coords)
     
@@ -267,47 +174,33 @@ def cluster_patches_kmeans(latCell, lonCell):
     labels_full = np.full(latCell.shape, -1, dtype=int)  # –1 marks “not clustered”
     labels_full[mask] = labels_f # Populate the array with the labels from the clustering
 
-    print("Cluster sizes:", collections.Counter(labels_full[mask]))
-    
-    #plt.hist(labels_full[mask])
-    counts, bins = np.histogram(labels_f)
-    #plt.stairs(counts, bins)
-    plt.hist(bins[:-1], bins, weights=counts)
-    plt.savefig("histogram_kmeans_patches.png")
-    plt.close()
+    bar_graph_cluster_distribution(labels_full, mask, algorithm="kmeans")
     
     return labels_full
 
-
-
-
-def get_rows_of_patches(latCell, lonCell):
+def get_rows_of_patches(latCell, lonCell, lat_threshold=50, cells_per_cluster=49):
     
     # --- 1.  Mask for ≥50 ° N ------------------------------------
+    mask = latCell > lat_threshold
     indices = np.where(latCell > LAT_LIMIT)
     print("Non-zeroes", np.count_nonzero(indices[0]))
 
     labels_full = np.full(latCell.shape, -1, dtype=int)
-
     bucket = 0
 
     for i, index in enumerate(indices[0]):
         labels_full[index] = bucket
         if (i+1) % 49 == 0 and i > 0:
             bucket += 1
-
-    print("Cluster sizes:", collections.Counter(labels_full[indices]))
     
-    plt.hist(labels_full[indices])
-    plt.savefig("histogram_patch_rows.png")
-    plt.close()
+    bar_graph_cluster_distribution(labels_full, mask, algorithm="row_by_row")
     
     return labels_full
 
-def get_clusters_dbscan(latCell, lonCell):
+def get_clusters_dbscan(latCell, lonCell, lat_threshold=50, cells_per_cluster=49):
 
     # --- 1.  Mask for ≥50 ° N ------------------------------------
-    mask = latCell > 50                     # Boolean array, True for 35623 rows
+    mask = latCell > lat_threshold          # Boolean array, True for 35623 rows
     lat_f = np.radians(latCell[mask])
     lon_f = np.radians(lonCell[mask])
     print("Non-zeroes", np.count_nonzero(mask)) # prints 35623
@@ -318,12 +211,12 @@ def get_clusters_dbscan(latCell, lonCell):
 
     # make an elbow plot to see the best value for eps
     
-    neighbors = NearestNeighbors(n_neighbors=49, algorithm='ball_tree', metric='haversine')
+    neighbors = NearestNeighbors(n_neighbors=cells_per_cluster, algorithm='ball_tree', metric='haversine')
     neighbors_fit = neighbors.fit(coords)
     distances, indices = neighbors_fit.kneighbors(coords)
 
     distances = np.sort(distances, axis=0)
-    distances = distances[:, 48]  # index 48 = 49th nearest
+    distances = distances[:, cells_per_cluster-1]  # index 48 = 49th nearest
     plt.plot(distances)
     plt.savefig("elbow_plot.png")
     plt.close()
@@ -353,11 +246,7 @@ def get_clusters_dbscan(latCell, lonCell):
     labels_full = np.full(latCell.shape, -1, dtype=int)  # –1 marks “not clustered”
     labels_full[mask] = labels # Populate the array with the labels from the clustering
 
-    print(len(labels_full[mask]))
-
-    plt.hist(labels_full[mask])
-    plt.savefig("histogram_dbscan_patches.png")
-    plt.close()
+    bar_graph_cluster_distribution(labels_full, mask, algorithm="dbscan")
 
     return labels_full
     

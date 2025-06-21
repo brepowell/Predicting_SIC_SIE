@@ -481,8 +481,13 @@ def map_patches_by_index_binned(fig,
                                 latCell, lonCell,            # 1-D numpy arrays
                                 patch_indices,               # 0 … len(latCell)-1
                                 hemisphereMap,
-                                dot_size=DOT_SIZE):
-    """Plot every 49-cell patch in its own colour (727 patches total)."""
+                                n_patches,
+                                cells_per_cluster,
+                                dot_size=DOT_SIZE, 
+                                algorithm = "", 
+                                color_map="flag", 
+                                ):
+    """Plot every patch in its own color."""
 
     # --------- choose the cells you really want to see ----------
     mask = latCell > LAT_LIMIT          # keep everything else the same
@@ -494,7 +499,7 @@ def map_patches_by_index_binned(fig,
     num_bins = patch_id.max() + 1
     
     # Generate colors
-    base_cmap = get_cmap("flag")  # Easier to see stripes
+    base_cmap = get_cmap(color_map)  # Easier to see stripes
     colors = [base_cmap(i / num_bins) for i in range(num_bins)]
     
     # Assign color per bin
@@ -529,15 +534,14 @@ def map_patches_by_index_binned(fig,
                         fraction=0.05, pad=0.08,
                         shrink=0.8, aspect=30,
                         location='bottom')
-    cbar.set_label('Patch ID (49 cells each)')
-    # 727 ticks are illegible – remove them:
+    cbar.set_label(f'Patch ID ({cells_per_cluster} cells each)')
     cbar.set_ticks([])
 
     # --------- titles & save -----------------------------------
-    hemisphereMap.set_title("Mesh – 727 patches (49 cells each)")
+    hemisphereMap.set_title(f"Mesh – {n_patches} patches ({cells_per_cluster} cells each)")
     hemisphereMap.axis('off')
     plt.suptitle("Mesh by Patch", size="x-large", fontweight="bold")
-    plt.savefig("mesh_patches_binned.png")
+    plt.savefig(f"mesh_patches_binned_{algorithm}_size_{cells_per_cluster}_.png")
     plt.close(fig)
 
     return sc
