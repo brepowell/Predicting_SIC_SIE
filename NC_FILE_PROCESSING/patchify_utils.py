@@ -1,7 +1,10 @@
 from NC_FILE_PROCESSING.nc_utility_functions import *
-from sklearn.cluster import KMeans
-from sklearn.cluster import DBSCAN
-from sklearn.neighbors import NearestNeighbors
+# from sklearn.cluster import KMeans
+# from sklearn.cluster import DBSCAN
+# from sklearn.neighbors import NearestNeighbors
+# from sklearn.cluster import AgglomerativeClustering
+# from sklearn.neighbors import kneighbors_graph
+
 import numpy as np
 
 def latlon_to_xyz(lat, lon):
@@ -38,8 +41,72 @@ def bar_graph_cluster_distribution(labels_full, mask, algorithm = "patches"):
     plt.savefig(f"distribution_{algorithm}_patches_{distinct_count}.png")
     plt.close()
 
-from sklearn.cluster import AgglomerativeClustering
-from sklearn.neighbors import kneighbors_graph
+import random
+
+def grow_patch(seed_idx, cellsOnCell, visited, patch_size, valid_mask=None):
+    """
+    Grow a patch starting from seed_idx using mesh adjacency.
+    This method is used in "build_patches_from_seeds"
+    """
+    patch = set()
+    frontier = [seed_idx]
+    visited.add(seed_idx)
+
+    while frontier and len(patch) < patch_size:
+        current = frontier.pop(0)
+        patch.add(current)
+
+        neighbors = cellsOnCell[current]
+        for neighbor in neighbors:
+            if neighbor == -1:
+                continue  # Skip invalid neighbors
+            if neighbor in visited:
+                continue
+            if valid_mask is not None and not valid_mask[neighbor]:
+                continue  # Skip masked-out cells
+
+            visited.add(neighbor)
+            frontier.append(neighbor)
+
+    return list(patch)  # Return as list for consistency
+
+def build_patches_from_seeds(cellsOnCell, n_patches=727, patch_size=49, seed=42, valid_mask=None):
+    rng = np.random.default_rng(seed)
+    nCells = cellsOnCell.shape[0]
+
+    if valid_mask is None:
+        valid_mask = np.ones(nCells, dtype=bool)
+
+    # Precompute valid indices to sample seeds from
+    candidate_seeds = np.where(valid_mask)[0]
+    rng.shuffle(candidate_seeds)
+
+    visited = set()
+    patches = []
+
+    for seed_idx in candidate_seeds:
+        if seed_idx in visited:
+            continue
+
+        patch = grow_patch(seed_idx, cellsOnCell, visited, patch_size, valid_mask)
+
+        if len(patch) < patch_size:
+            continue  # Skip undersized patches
+
+        patches.append(patch)
+        if len(patches) >= n_patches:
+            break
+
+    print(f"Built {len(patches)} patches of size ~{patch_size}")
+
+    labels_full = np.full(cellsOnCell.shape[0], -1, dtype=int)
+    for i, patch in enumerate(patches):
+        labels_full[patch] = i
+
+    bar_graph_cluster_distribution(labels_full, valid_mask, algorithm="breadth_first")
+
+    #return patches
+    return labels_full
 
 def compute_agglomerative_patches(latCell, lonCell, lat_threshold=50, n_patches=727, n_neighbors=6):
 
