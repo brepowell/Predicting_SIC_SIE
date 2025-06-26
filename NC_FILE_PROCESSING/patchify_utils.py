@@ -41,6 +41,254 @@ def bar_graph_cluster_distribution(labels_full, mask, algorithm = "patches"):
     plt.savefig(f"distribution_{algorithm}_patches_{distinct_count}.png")
     plt.close()
 
+import numpy as np
+
+def patchify_by_latlon_spillover(latCell, lonCell, k=49, max_patches=727, lat_threshold=40.0):
+    """
+    Create spatially coherent patches based on sorted lat/lon without clustering.
+    Walks from high latitude to low, grouping cells in longitude stripes and spilling over as needed.
+
+    Parameters
+    ----------
+    latCell : np.ndarray
+        1D array of cell latitudes.
+    lonCell : np.ndarray
+        1D array of cell longitudes.
+    k : int
+        Approximate number of cells per patch.
+    max_patches : int
+        Maximum number of patches to form.
+    lat_threshold : float
+        Don't form patches below this latitude.
+
+    Returns
+    -------
+    patches : List[np.ndarray]
+        List of patches, each a list of cell indices (np.ndarray of ints).
+    labels_full : np.ndarray
+        Array of shape (nCells,) giving patch ID or -1 if unassigned.
+    """
+
+    nCells = len(latCell)
+    used = np.zeros(nCells, dtype=bool)
+
+    # Filter valid candidates
+    mask = latCell >= lat_threshold
+    indices = np.where(mask)[0]
+
+    # Sort by latitude (descending), then by longitude (ascending)
+    # lexsort returns indices from the original arrays (ex. 0 through 465044)
+    sort_order = np.lexsort((lonCell[indices], -latCell[indices]))
+    sorted_indices = indices[sort_order]
+
+    patches = []
+    labels_full = np.full(nCells, -1, dtype=int)
+    patch_id = 0
+    current_patch = []
+
+    for idx in sorted_indices:
+        if used[idx]:
+            continue
+
+        current_patch.append(idx)
+        used[idx] = True
+
+        if len(current_patch) == k:
+            patches.append(np.array(current_patch, dtype=int))
+            labels_full[current_patch] = patch_id
+            patch_id += 1
+            current_patch = []
+
+            if patch_id >= max_patches:
+                break
+
+    # Optionally add a final partial patch
+    if current_patch and patch_id < max_patches:
+        patches.append(np.array(current_patch, dtype=int))
+        labels_full[current_patch] = patch_id
+
+    print(f"Built {len(patches)} patches of size ~{k}")
+    
+    # Flatten and relabel for visualization
+    labels_full = np.full(len(latCell), -1)
+    for i, inds in enumerate(patches):
+        labels_full[inds] = i
+    
+    bar_graph_cluster_distribution(labels_full, mask=np.ones_like(latCell, dtype=bool), algorithm="latlon_spillover")
+
+    #return patches
+    return labels_full
+
+
+
+def patchify_with_spillover(latCell, patch_size=49, 
+                            min_lat=40, max_lat=90, 
+                            step_deg=3, max_patches=None, seed=42):
+    """
+    Sweep latitudinal bands and form spatially cohesive patches, 
+    letting underfilled patches spill into the next band.
+    """
+    rng = np.random.default_rng(seed)
+    latCell = np.array(latCell)
+    
+    patch_indices = []
+    used = np.zeros(len(latCell), dtype=bool)
+    carryover = []
+
+    for band_max in np.arange(max_lat, min_lat, -step_deg):
+        band_min = band_max - step_deg
+        band_mask = (latCell >= band_min) & (latCell < band_max) & (~used)
+        band_ids = np.where(band_mask)[0]
+        
+        # Combine with carryover from the previous band
+        candidates = np.concatenate([carryover, band_ids]).astype(int)
+        rng.shuffle(candidates)
+        
+        num_full = len(candidates) // patch_size
+        for i in range(num_full):
+            patch = candidates[i*patch_size : (i+1)*patch_size]
+            patch_indices.append(patch)
+            used[patch] = True
+        
+        # Save leftovers for the next band
+        leftover = candidates[num_full * patch_size:]
+        carryover = leftover
+
+        if max_patches is not None and len(patch_indices) >= max_patches:
+            break
+
+    # Flatten and relabel for visualization
+    labels_full = np.full(len(latCell), -1)
+    for i, inds in enumerate(patch_indices):
+        labels_full[inds] = i
+    
+    bar_graph_cluster_distribution(labels_full, mask=np.ones_like(latCell, dtype=bool), algorithm="latitude_spillover_redo")
+
+    # avg latitude of each patch
+    avg_lats = np.array([latCell[patch].mean() for patch in patch_indices])
+    
+    # Scatter plot of patch_id vs avg_latitude
+    plt.scatter(range(len(avg_lats)), avg_lats)
+    plt.xlabel("Patch ID")
+    plt.ylabel("Average Latitude")
+    plt.title("Are Patch IDs ordered by latitude?")
+    plt.savefig("patch_ids_by_avg_lat.png")
+    plt.close()
+    print("saved_fig")
+    
+    #return patch_indices
+    return labels_full
+
+
+import numpy as np
+from sklearn.neighbors import NearestNeighbors
+
+import numpy as np
+
+def patchify_by_latitude_simple(latCell, patch_size=49, 
+                                min_lat=40, max_lat=90, 
+                                step_deg=3, seed=42):
+    """
+    Divide cells into patches by sweeping latitude bands north → south.
+    No clustering used—just chunking within each band.
+    
+    Parameters:
+    - latCell: np.ndarray of cell latitudes
+    - patch_size: desired number of cells per patch
+    - min_lat, max_lat: bounds for latitude (degrees)
+    - step_deg: width of latitude bands
+    """
+    rng = np.random.default_rng(seed)
+    latCell = np.array(latCell)
+    
+    patch_indices = []
+    used = np.zeros(len(latCell), dtype=bool)
+
+    for band_max in np.arange(max_lat, min_lat, -step_deg):
+        band_min = band_max - step_deg
+        band_mask = (latCell >= band_min) & (latCell < band_max) & (~used)
+        band_ids = np.where(band_mask)[0]
+
+        if len(band_ids) < patch_size:
+            continue  # skip too-small bands
+
+        rng.shuffle(band_ids)  # randomize order
+
+        for i in range(0, len(band_ids) - patch_size + 1, patch_size):
+            patch = band_ids[i:i+patch_size]
+            patch_indices.append(patch)
+            used[patch] = True
+
+    # Flatten and relabel for visualization
+    labels_full = np.full(len(latCell), -1)
+    for i, inds in enumerate(patch_indices):
+        labels_full[inds] = i
+    
+    bar_graph_cluster_distribution(labels_full, mask=np.ones_like(latCell, dtype=bool), algorithm="latitude_simple")
+    
+    #return patch_indices
+    return labels_full
+
+
+def patchify_by_latitude(latCell, lonCell, patch_size=49, 
+                         min_lat=40, max_lat=90, 
+                         step_deg=3, seed=42):
+    """
+    Group mesh cells into patches from north pole southward using latitude bands.
+    """
+    latCell = np.array(latCell)
+    lonCell = np.array(lonCell)
+    coords = latlon_to_xyz(latCell, lonCell)
+    
+    rng = np.random.default_rng(seed)
+    used = np.zeros(len(latCell), dtype=bool)
+    patch_indices = []
+    
+    for band_max in np.arange(max_lat, min_lat, -step_deg):
+        band_min = band_max - step_deg
+        band_mask = (latCell >= band_min) & (latCell < band_max) & (~used)
+        band_indices = np.where(band_mask)[0]
+
+        if len(band_indices) < patch_size:
+            continue
+
+        band_coords = coords[band_indices]
+
+        # Fit kNN model
+        knn = NearestNeighbors(n_neighbors=patch_size)
+        knn.fit(band_coords)
+
+        selected = set()
+        attempts = 0
+
+        while len(selected) < len(band_indices) and attempts < len(band_indices):
+            seed_idx = rng.choice(band_indices)
+            if used[seed_idx]:
+                attempts += 1
+                continue
+
+            _, nbrs = knn.kneighbors([coords[seed_idx]])
+            nbrs_global = band_indices[nbrs[0]]
+            
+            # Ensure none of them are already used
+            if np.any(used[nbrs_global]):
+                attempts += 1
+                continue
+
+            patch_indices.append(nbrs_global)
+            used[nbrs_global] = True
+            attempts += 1
+
+    # Flatten and relabel for visualization
+    labels_full = np.full(len(latCell), -1)
+    for i, inds in enumerate(patch_indices):
+        labels_full[inds] = i
+    
+    bar_graph_cluster_distribution(labels_full, mask=np.ones_like(latCell, dtype=bool), algorithm="latitude_neighbors")
+
+    #return patch_indices  # list of arrays
+    return labels_full
+
 import random
 
 def grow_patch(seed_idx, cellsOnCell, visited, patch_size, valid_mask=None):

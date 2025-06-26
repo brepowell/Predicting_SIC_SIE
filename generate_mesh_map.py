@@ -11,9 +11,8 @@ def main():
     latCell, lonCell = load_mesh(perlmutterpathMesh)
 
     print("Number of Cells", len(latCell))
-
     
-
+    '''
     patches = np.load("patches.npy")
     mask = patches == -1
     
@@ -21,23 +20,24 @@ def main():
     fig, northMap = generate_axes_north_pole()
     map_lats_lons_one_color(fig, latCell[mask], lonCell[mask], northMap)
 
-    '''
+    
     fig, northMap = generate_axes_north_pole() 
     map_lats_lons_gradient_by_index(fig, latCell, lonCell, northMap)
 
     # Creates a map of the mesh where larger indices are darker, so I can see how the mesh is indexed.
     fig, [northMap, southMap, plateCar, orthoMap, robinMap, rotPolMap]  = generate_axes_all_projections()
-    map_all_lats_lons_gradient_by_index(fig, latCell, lonCell, northMap, southMap, plateCar, orthoMap, robinMap, rotPolMap) 
+    map_all_lats_lons_gradient_by_index(fig, latCell, lonCell, northMap, southMap, plateCar, 
+                                        orthoMap, robinMap, rotPolMap) 
 
     # Creates a map of the mesh where every 50k grid cells are color-coded so I can see how the mesh is indexed.
     fig, [northMap, southMap, plateCar, orthoMap, robinMap, rotPolMap]  = generate_axes_all_projections()
-    map_all_lats_lons_binned_by_index(fig, latCell, lonCell, northMap, southMap, plateCar, orthoMap, robinMap, rotPolMap) 
+    map_all_lats_lons_binned_by_index(fig, latCell, lonCell, northMap, southMap, 
+                                    plateCar, orthoMap, robinMap, rotPolMap) 
     '''
 
     lat_threshold = 50
     n_patches = 727
     cells_per_patch = 49
-
     
     # Different patching techniques
     #patches = cluster_patches_kmeans(latCell, lonCell, lat_threshold) # Patching in clusters, like k-means
@@ -46,8 +46,20 @@ def main():
     #patches = compute_knn_patches(latCell, lonCell, lat_threshold, cells_per_patch, n_patches, seed=42)
     #patches = compute_disjoint_knn_patches(latCell, lonCell, lat_threshold, cells_per_patch, n_patches, seed=42)
     #patches = compute_agglomerative_patches(latCell, lonCell, lat_threshold, n_patches)
+    #patches = patchify_by_latitude(latCell, lonCell, patch_size=cells_per_patch, 
+    #                            min_lat=lat_threshold, max_lat=90, step_deg=3, seed=42)
+    # patches = patchify_by_latitude_simple(latCell, patch_size=cells_per_patch, 
+    #                                       min_lat=lat_threshold, max_lat=90, step_deg=3, seed=42)
 
-    # ----------------------------------
+    cellsOnCell = np.load("cellsOnCell.npy")
+    
+    # patches = patchify_with_spillover(latCell, patch_size=cells_per_patch, 
+    #                         min_lat=lat_threshold, max_lat=90, 
+    #                         step_deg=3, max_patches=n_patches, seed=42)
+
+    patches = patchify_by_latlon_spillover(latCell, lonCell, k=cells_per_patch, max_patches=n_patches, lat_threshold=lat_threshold)
+
+    # ----------- breadth-first method ------
     # mesh = xr.open_dataset("NC_FILE_PROCESSING/mpassi.IcoswISC30E3r5.20231120.nc")
 
     # cellsOnCell = mesh["cellsOnCell"].values
@@ -68,14 +80,14 @@ def main():
     # fig, northMap = generate_axes_north_pole()
     # map_patches_by_index(fig, latCell, lonCell, patches, northMap)
 
-    # fig, northMap = generate_axes_north_pole()
-    # map_patches_by_index_binned(fig,
-    #                             latCell, lonCell, patches,   # 1-D numpy arrays
-    #                             northMap,
-    #                             n_patches, cells_per_patch,
-    #                             algorithm = "dbscan", 
-    #                             color_map="flag", 
-    #                             )
+    fig, northMap = generate_axes_north_pole()
+    map_patches_by_index_binned(fig,
+                                latCell, lonCell, patches,   # 1-D numpy arrays
+                                northMap,
+                                n_patches, cells_per_patch,
+                                algorithm = "latlon_spillover", 
+                                color_map="flag", 
+                                )
 
     #animate_patch_reveal(latCell, lonCell, patches)
     
