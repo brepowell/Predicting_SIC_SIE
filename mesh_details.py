@@ -28,7 +28,7 @@ def main():
     print("How many cells would there be if I mask the data down to certain latitudes?")
     
     for latitude_limit in latitudes_to_try:
-        indices = np.where(latCell > latitude_limit)
+        indices = np.where(latCell >= latitude_limit)
         cellCount = len(indices[0])
 
         print("=========================================")

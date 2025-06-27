@@ -4,8 +4,8 @@ from NC_FILE_PROCESSING.nc_utility_functions import *
 # from sklearn.neighbors import NearestNeighbors
 # from sklearn.cluster import AgglomerativeClustering
 # from sklearn.neighbors import kneighbors_graph
-
 import numpy as np
+import random
 
 def latlon_to_xyz(lat, lon):
     """Convert lat/lon (in degrees) to 3D unit sphere coordinates"""
@@ -40,8 +40,6 @@ def bar_graph_cluster_distribution(labels_full, mask, algorithm = "patches"):
     plt.title("Cells per Patch")
     plt.savefig(f"distribution_{algorithm}_patches_{distinct_count}.png")
     plt.close()
-
-import numpy as np
 
 def patchify_by_latlon_spillover(latCell, lonCell, k=49, max_patches=727, lat_threshold=40.0):
     """
@@ -116,10 +114,7 @@ def patchify_by_latlon_spillover(latCell, lonCell, k=49, max_patches=727, lat_th
     
     bar_graph_cluster_distribution(labels_full, mask=np.ones_like(latCell, dtype=bool), algorithm="latlon_spillover")
 
-    #return patches
-    return labels_full
-
-
+    return labels_full, patches
 
 def patchify_with_spillover(latCell, patch_size=49, 
                             min_lat=40, max_lat=90, 
@@ -176,14 +171,7 @@ def patchify_with_spillover(latCell, patch_size=49,
     plt.close()
     print("saved_fig")
     
-    #return patch_indices
-    return labels_full
-
-
-import numpy as np
-from sklearn.neighbors import NearestNeighbors
-
-import numpy as np
+    return labels_full, patch_indices
 
 def patchify_by_latitude_simple(latCell, patch_size=49, 
                                 min_lat=40, max_lat=90, 
@@ -226,8 +214,7 @@ def patchify_by_latitude_simple(latCell, patch_size=49,
     
     bar_graph_cluster_distribution(labels_full, mask=np.ones_like(latCell, dtype=bool), algorithm="latitude_simple")
     
-    #return patch_indices
-    return labels_full
+    return labels_full, patch_indices
 
 
 def patchify_by_latitude(latCell, lonCell, patch_size=49, 
@@ -286,10 +273,7 @@ def patchify_by_latitude(latCell, lonCell, patch_size=49,
     
     bar_graph_cluster_distribution(labels_full, mask=np.ones_like(latCell, dtype=bool), algorithm="latitude_neighbors")
 
-    #return patch_indices  # list of arrays
-    return labels_full
-
-import random
+    return labels_full, patch_indices
 
 def grow_patch(seed_idx, cellsOnCell, visited, patch_size, valid_mask=None):
     """
@@ -353,8 +337,7 @@ def build_patches_from_seeds(cellsOnCell, n_patches=727, patch_size=49, seed=42,
 
     bar_graph_cluster_distribution(labels_full, valid_mask, algorithm="breadth_first")
 
-    #return patches
-    return labels_full
+    return labels_full, patch_indices
 
 def compute_agglomerative_patches(latCell, lonCell, lat_threshold=50, n_patches=727, n_neighbors=6):
 
