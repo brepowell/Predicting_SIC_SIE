@@ -13,8 +13,8 @@ def main():
     print("Number of Cells", len(latCell))
     
     '''
-    patches = np.load("patches.npy")
-    mask = patches == -1
+    labels_full = np.load("labels_full.npy")
+    mask = labels_full == -1
     
     # Creates a map of the mesh all in one color (hot pink) so I can see the mesh
     fig, northMap = generate_axes_north_pole()
@@ -40,24 +40,26 @@ def main():
     cells_per_patch = 49
     
     # Different patching techniques
-    #patches = cluster_patches_kmeans(latCell, lonCell, lat_threshold) # Patching in clusters, like k-means
-    #patches = get_rows_of_patches(latCell, lonCell, lat_threshold) # Patching in rows or stripes
-    #patches = get_clusters_dbscan(latCell, lonCell, lat_threshold, cells_per_patch)
-    #patches = compute_knn_patches(latCell, lonCell, lat_threshold, cells_per_patch, n_patches, seed=42)
-    #patches = compute_disjoint_knn_patches(latCell, lonCell, lat_threshold, cells_per_patch, n_patches, seed=42)
-    #patches = compute_agglomerative_patches(latCell, lonCell, lat_threshold, n_patches)
-    #patches = patchify_by_latitude(latCell, lonCell, patch_size=cells_per_patch, 
+    #labels_full = cluster_patches_kmeans(latCell, lonCell, lat_threshold) # Patching in clusters, like k-means
+    #labels_full = get_rows_of_patches(latCell, lonCell, lat_threshold) # Patching in rows or stripes
+    #labels_full = get_clusters_dbscan(latCell, lonCell, lat_threshold, cells_per_patch)
+    #labels_full = compute_knn_patches(latCell, lonCell, lat_threshold, cells_per_patch, n_patches, seed=42)
+    #labels_full = compute_disjoint_knn_patches(latCell, lonCell, lat_threshold, cells_per_patch, n_patches, seed=42)
+    #labels_full = compute_agglomerative_patches(latCell, lonCell, lat_threshold, n_patches)
+    #labels_full = patchify_by_latitude(latCell, lonCell, patch_size=cells_per_patch, 
     #                            min_lat=lat_threshold, max_lat=90, step_deg=3, seed=42)
-    # patches = patchify_by_latitude_simple(latCell, patch_size=cells_per_patch, 
+    # labels_full = patchify_by_latitude_simple(latCell, patch_size=cells_per_patch, 
     #                                       min_lat=lat_threshold, max_lat=90, step_deg=3, seed=42)
 
     cellsOnCell = np.load("cellsOnCell.npy")
     
-    # patches = patchify_with_spillover(latCell, patch_size=cells_per_patch, 
+    # labels_full = patchify_with_spillover(latCell, patch_size=cells_per_patch, 
     #                         min_lat=lat_threshold, max_lat=90, 
     #                         step_deg=3, max_patches=n_patches, seed=42)
 
-    patches = patchify_by_latlon_spillover(latCell, lonCell, k=cells_per_patch, max_patches=n_patches, lat_threshold=lat_threshold)
+    labels_full, patches = patchify_by_latlon_spillover(latCell, lonCell, k=cells_per_patch, max_patches=n_patches, lat_threshold=lat_threshold)
+
+    print(labels_full)
 
     # ----------- breadth-first method ------
     # mesh = xr.open_dataset("NC_FILE_PROCESSING/mpassi.IcoswISC30E3r5.20231120.nc")
@@ -69,27 +71,27 @@ def main():
     
     # valid_mask = np.degrees(mesh["latCell"].values) > lat_threshold # Optional mask (e.g. exclude southern hemisphere)
     
-    # patches = build_patches_from_seeds(cellsOnCell, patch_size=49, n_patches=727, valid_mask=valid_mask)
+    # labels_full = build_patches_from_seeds(cellsOnCell, patch_size=49, n_patches=727, valid_mask=valid_mask)
 
-    # np.save('patches.npy', patches) 
+    # np.save('patches_using_breadth_first.npy', labels_full) 
 
     # ----------------------------------
     # Load the labels
-    # patches = np.load("patches.npy")
+    # labels_full = np.load("patches_using_breadth_first.npy")
 
     # fig, northMap = generate_axes_north_pole()
-    # map_patches_by_index(fig, latCell, lonCell, patches, northMap)
+    # map_patches_by_index(fig, latCell, lonCell, labels_full, northMap)
 
     fig, northMap = generate_axes_north_pole()
     map_patches_by_index_binned(fig,
-                                latCell, lonCell, patches,   # 1-D numpy arrays
+                                latCell, lonCell, labels_full,   # 1-D numpy arrays
                                 northMap,
                                 n_patches, cells_per_patch,
                                 algorithm = "latlon_spillover", 
                                 color_map="flag", 
                                 )
 
-    #animate_patch_reveal(latCell, lonCell, patches)
+    #animate_patch_reveal(latCell, lonCell, labels_full)
     
 if __name__ == "__main__":
     main()

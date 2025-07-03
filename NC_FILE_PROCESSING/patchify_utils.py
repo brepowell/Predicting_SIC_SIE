@@ -33,8 +33,11 @@ def bar_graph_cluster_distribution(labels_full, mask, algorithm = "patches"):
     distinct_count = len(set(labels_full[mask]))
     print("number of patches:" , distinct_count) # Output: 727
 
+    total_cells_after_mask = np.count_nonzero(mask)
+    ylim_patch_size = (total_cells_after_mask / distinct_count) + 50
+
     plt.bar(patch_ids, cells_per_patch)
-    plt.ylim(0, 100)  # Sets the y-axis from 0 to 500
+    plt.ylim(0, ylim_patch_size)  # Sets the y-axis from 0 to 20 more than the expected patch size
     plt.xlabel("Patch ID's")
     plt.ylabel("Cell Count")
     plt.title("Cells per Patch")
