@@ -6,33 +6,41 @@ from datetime import datetime, timedelta
 import collections
 import matplotlib.pyplot as plt
 import os
+from pathlib import Path
 
 #######################
 # DIRECTORY FUNCTIONS #
 #######################
 
-def gather_files(useFullPath = True, path = FULL_PATH):
-    """ Use the subdirectory specified in the config file. 
-    Get all netCDF files in that folder. Return a list of .nc files sorted alphabetically. """
-    all_nc_files_in_folder = []
-    print("Path to files is ", path)
+def gather_files(useFullPath=True, path=None):
+    """
+    Use the subdirectory specified in the config file.
+    Get all netCDF files in that folder. Return a list of .nc files sorted alphabetically.
+    """
+    if path is None:
+        raise ValueError("A path must be provided or FULL_PATH must be defined globally.")
 
+    # Convert the path string to a Path object for pathlib operations
+    base_path = Path(path)
+    
+    print(f"Path to files is {base_path}")
+
+    # Use a generator expression with rglob for more efficient traversal and filtering
+    # rglob("**/*.nc") finds all files ending with .nc recursively
     if useFullPath:
-        for root, dirs, files in os.walk(path, topdown=False):
-            for name in files:
-                if name.endswith('.nc'):
-                    all_nc_files_in_folder.append(os.path.join(root, name))
-
+        all_nc_files_generator = base_path.rglob("*.nc")
+        all_nc_files = [str(f) for f in all_nc_files_generator]
     else:
-        for root, dirs, files in os.walk(path, topdown=False):
-            for name in files:
-                if name.endswith('.nc'):
-                    all_nc_files_in_folder.append(name)
+        # If full path is not needed, you'd typically just want the file names
+        # in their respective directories relative to base_path.
+        # This requires iterating and getting the relative path.
+        all_nc_files_generator = base_path.rglob("*.nc")
+        all_nc_files = [f.name for f in all_nc_files_generator] # Get only the filename
 
-    print("Read this many files: ", len(all_nc_files_in_folder))
+    print(f"Read this many files: {len(all_nc_files)}")
 
     # Sort the list alphabetically before returning
-    return sorted(all_nc_files_in_folder)
+    return sorted(all_nc_files)
 
 def validate_path(directory_or_full_path, file_name=""):
     """ Take in a directory or full path and a file name. Check if the path leads to a .nc file. Return the full path. """
@@ -71,12 +79,12 @@ def load_mesh(path_to_nc_file, mesh_file_name="", print_read_statement=True):
     return latCell, lonCell
 
 
-def load_mesh_radians(path_to_nc_file, mesh_file_name="", print_read_statement=True):
+def load_mesh_radians(path, print_read_statement=True):
     """ Load the mesh from an .nc file. 
     The mesh must have the same resolution as the output file. 
     Return the latCell and lonCell variables. """
 
-    full_path = validate_path(path_to_nc_file, mesh_file_name)
+    full_path = validate_path(path)
         
     if print_read_statement:
         print('======= Read Mesh: ', full_path)

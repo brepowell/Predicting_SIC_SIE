@@ -3,7 +3,6 @@ from MAP_ANIMATION_GENERATION.map_gen_utility_functions import *
 from MAP_ANIMATION_GENERATION.map_label_utility_functions import *
 from MAP_ANIMATION_GENERATION.map_animation_utility_functions import * 
 from config import *
-#import xarray as xr
 
 def main():
     
@@ -36,8 +35,8 @@ def main():
     '''
 
     lat_threshold = 50
-    n_patches = 727
-    cells_per_patch = 49
+    n_patches = 140
+    cells_per_patch = 256
     
     # Different patching techniques
     #labels_full = cluster_patches_kmeans(latCell, lonCell, lat_threshold) # Patching in clusters, like k-means
@@ -51,15 +50,17 @@ def main():
     # labels_full = patchify_by_latitude_simple(latCell, patch_size=cells_per_patch, 
     #                                       min_lat=lat_threshold, max_lat=90, step_deg=3, seed=42)
 
-    cellsOnCell = np.load("cellsOnCell.npy")
+    #cellsOnCell = np.load("cellsOnCell.npy")
     
     # labels_full = patchify_with_spillover(latCell, patch_size=cells_per_patch, 
     #                         min_lat=lat_threshold, max_lat=90, 
     #                         step_deg=3, max_patches=n_patches, seed=42)
 
-    labels_full, patches = patchify_by_latlon_spillover(latCell, lonCell, k=cells_per_patch, max_patches=n_patches, lat_threshold=lat_threshold)
+    #labels_full, patches, patch_latlons = patchify_by_latlon_spillover(latCell, lonCell, k=cells_per_patch, max_patches=n_patches, lat_threshold=lat_threshold)
 
-    print(labels_full)
+    labels_full, patches, patch_latlons = patchify_by_lon_spilldown(latCell, lonCell, k=cells_per_patch, max_patches=n_patches, lat_threshold=lat_threshold)
+
+    #labels_full, patches, patch_latlons = patchify_staggered_polar_descent(latCell, lonCell, k=cells_per_patch, max_patches=n_patches, lat_threshold=lat_threshold)
 
     # ----------- breadth-first method ------
     # mesh = xr.open_dataset("NC_FILE_PROCESSING/mpassi.IcoswISC30E3r5.20231120.nc")
@@ -87,11 +88,11 @@ def main():
                                 latCell, lonCell, labels_full,   # 1-D numpy arrays
                                 northMap,
                                 n_patches, cells_per_patch,
-                                algorithm = "latlon_spillover", 
+                                algorithm = "lon_spilldown", 
                                 color_map="flag", 
                                 )
 
-    #animate_patch_reveal(latCell, lonCell, labels_full)
+    animate_patch_reveal(latCell, lonCell, labels_full, gif_path="patch_animation_lon_spilldown")
     
 if __name__ == "__main__":
     main()

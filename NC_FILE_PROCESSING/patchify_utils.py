@@ -6,6 +6,8 @@ from NC_FILE_PROCESSING.nc_utility_functions import *
 # from sklearn.neighbors import kneighbors_graph
 import numpy as np
 import random
+import collections
+import matplotlib.pyplot as plt
 
 def latlon_to_xyz(lat, lon):
     """Convert lat/lon (in degrees) to 3D unit sphere coordinates"""
@@ -44,6 +46,210 @@ def bar_graph_cluster_distribution(labels_full, mask, algorithm = "patches"):
     plt.savefig(f"distribution_{algorithm}_patches_{distinct_count}.png")
     plt.close()
 
+def patchify_staggered_polar_descent(latCell, lonCell, k=256, max_patches=727, lat_threshold=40.0):
+    """
+    Creates spatially coherent patches starting from the North Pole and staggering
+    downward by latitude and longitude. Each patch will contain exactly 'k' cells.
+
+    Parameters
+    ----------
+    latCell : np.ndarray
+        1D array of cell latitudes.
+    lonCell : np.ndarray
+        1D array of cell longitudes.
+    k : int
+        Exact number of cells per patch. Default is 256.
+    max_patches : int
+        Maximum number of patches to form.
+    lat_threshold : float
+        Don't form patches below this latitude.
+
+    Returns
+    -------
+    labels_full : np.ndarray
+        Array of shape (nCells,) giving patch ID or -1 if unassigned.
+    patches : List[np.ndarray]
+        List of patches, each a list of cell indices (np.ndarray of ints).
+    patch_latlons : np.ndarray
+        Array of shape (n_patches, 2) containing (latitude, longitude) for one
+        representative cell per patch (the first cell added to the patch).
+    """
+
+    nCells = len(latCell)
+    # 'used' array tracks which cells have already been assigned to a patch
+    used = np.zeros(nCells, dtype=bool) 
+
+    # Filter valid candidates based on the latitude threshold
+    mask = latCell >= lat_threshold
+    indices = np.where(mask)[0] # Get original indices of cells that meet the criteria
+
+    # Sort the eligible cell indices:
+    # Primary sort key: latitude (descending) - ensures we start from the North Pole
+    # Secondary sort key: longitude (ascending) - ensures a consistent scan across latitude bands
+    sort_order = np.lexsort((lonCell[indices], -latCell[indices]))
+    sorted_indices = indices[sort_order] # Original indices, sorted as desired
+
+    patches = [] # List to store arrays of cell indices for each patch
+    patch_latlons = []  # List to store (lat, lon) of the first cell of each patch
+    
+    # Initialize labels_full with -1 for all cells, indicating they are unassigned
+    labels_full = np.full(nCells, -1, dtype=int)
+    
+    patch_id = 0 # Counter for the current patch ID
+    
+    # We will iterate through the sorted_indices and pick cells for patches.
+    # We need a pointer to the current position in the sorted_indices array.
+    current_sorted_idx_pointer = 0
+
+    while current_sorted_idx_pointer < len(sorted_indices) and patch_id < max_patches:
+        # Find the next unused cell to start a new patch
+        seed_cell_original_idx = -1
+        while current_sorted_idx_pointer < len(sorted_indices):
+            potential_seed_idx = sorted_indices[current_sorted_idx_pointer]
+            if not used[potential_seed_idx]:
+                seed_cell_original_idx = potential_seed_idx
+                break
+            current_sorted_idx_pointer += 1 # Move pointer past used cells
+
+        if seed_cell_original_idx == -1:
+            # No more unused cells found among the eligible ones
+            break
+
+        current_patch_indices = []
+        current_patch_first_latlon = (latCell[seed_cell_original_idx], lonCell[seed_cell_original_idx])
+
+        # Greedily collect 'k' cells for the current patch
+        # Start from the seed cell and move forward in the sorted list
+        temp_pointer = current_sorted_idx_pointer
+        while len(current_patch_indices) < k and temp_pointer < len(sorted_indices):
+            cell_to_add_original_idx = sorted_indices[temp_pointer]
+            if not used[cell_to_add_original_idx]:
+                current_patch_indices.append(cell_to_add_original_idx)
+                used[cell_to_add_original_idx] = True # Mark as used
+            temp_pointer += 1
+        
+        # If we successfully collected 'k' cells, finalize the patch
+        if len(current_patch_indices) == k:
+            patches.append(np.array(current_patch_indices, dtype=int))
+            labels_full[current_patch_indices] = patch_id
+            patch_latlons.append(current_patch_first_latlon)
+            
+            patch_id += 1 # Increment patch ID for the next patch
+        else:
+            # If we couldn't form a full patch of 'k' cells (e.g., not enough remaining cells),
+            # revert 'used' status for these cells and break the loop for this patch.
+            # These cells will remain unassigned.
+            for idx in current_patch_indices:
+                used[idx] = False # Unmark them as used
+            # No full patch formed, so we stop trying to form patches from this region
+            break 
+        
+        # Advance the main pointer to the next unassigned cell for the next iteration
+        # This is important to avoid re-processing cells that were part of the current patch
+        # or were skipped because they were already used.
+        # The while loop at the beginning of the main loop handles skipping used cells.
+        current_sorted_idx_pointer = temp_pointer
+
+    print(f"Built {len(patches)} patches, each with exactly {k} cells.")
+    
+    # Call the bar graph function to visualize the distribution of the created patches.
+    # The 'mask' here ensures the bar graph considers only the cells that were eligible.
+    bar_graph_cluster_distribution(labels_full, mask=mask, algorithm="staggered_polar_descent")
+
+    # Return the full labels array, the list of patch index arrays, and the representative lat/lons
+    return labels_full, patches, np.array(patch_latlons)
+
+def patchify_by_lon_spilldown(latCell, lonCell, k=49, max_patches=727, lat_threshold=40.0):
+    """
+    Creates spatially coherent patches by grouping cells primarily by longitude
+    and then spilling downward in latitude. Each patch will contain exactly 'k' cells.
+
+    Parameters
+    ----------
+    latCell : np.ndarray
+        1D array of cell latitudes.
+    lonCell : np.ndarray
+        1D array of cell longitudes.
+    k : int
+        Exact number of cells per patch.
+    max_patches : int
+        Maximum number of patches to form.
+    lat_threshold : float
+        Don't form patches below this latitude.
+
+    Returns
+    -------
+    labels_full : np.ndarray
+        Array of shape (nCells,) giving patch ID or -1 if unassigned.
+    patches : List[np.ndarray]
+        List of patches, each a list of cell indices (np.ndarray of ints).
+    patch_latlons : np.ndarray
+        Array of shape (n_patches, 2) containing (latitude, longitude) for one
+        representative cell per patch (the first cell added to the patch).
+    """
+
+    nCells = len(latCell)
+    used = np.zeros(nCells, dtype=bool) # Tracks which cells have been assigned to a patch
+
+    # Filter valid candidates based on the latitude threshold
+    mask = latCell >= lat_threshold
+    indices = np.where(mask)[0] # Get original indices of cells that meet the criteria
+
+    # Sort the eligible cell indices:
+    # Primary sort key: longitude (ascending) - groups cells into "columns"
+    # Secondary sort key: latitude (descending) - within each column, processes from north to south
+    sort_order = np.lexsort((-latCell[indices], lonCell[indices]))
+    sorted_indices = indices[sort_order] # Original indices, sorted as desired
+
+    patches = [] # List to store arrays of cell indices for each patch
+    patch_latlons = []  # List to store (lat, lon) of the first cell of each patch
+    
+    # Initialize labels_full with -1 for all cells, indicating they are unassigned
+    labels_full = np.full(nCells, -1, dtype=int)
+    
+    patch_id = 0 # Counter for the current patch ID
+    current_patch_indices = [] # Temporarily holds indices for the patch being built
+    current_patch_first_latlon = None # Stores the lat/lon of the first cell in the current patch
+
+    # Iterate through the sorted cells to form patches
+    for idx in sorted_indices:
+        if used[idx]:
+            # Skip cells that have already been assigned to a patch
+            continue
+
+        # If we are starting a new patch, record the lat/lon of its first cell
+        if not current_patch_indices:
+            current_patch_first_latlon = (latCell[idx], lonCell[idx])
+
+        # Add the current cell to the patch being built
+        current_patch_indices.append(idx)
+        used[idx] = True # Mark this cell as used
+
+        # If the current patch has reached the desired size 'k'
+        if len(current_patch_indices) == k:
+            # Finalize the patch
+            patches.append(np.array(current_patch_indices, dtype=int))
+            labels_full[current_patch_indices] = patch_id # Assign patch ID to these cells
+            patch_latlons.append(current_patch_first_latlon) # Store representative lat/lon
+            
+            patch_id += 1 # Increment patch ID for the next patch
+            current_patch_indices = [] # Reset for the next patch
+            current_patch_first_latlon = None # Reset the representative lat/lon
+
+            # Stop if the maximum number of patches has been reached
+            if patch_id >= max_patches:
+                print(f"Reached max_patches ({max_patches}). Stopping patch formation.")
+                break
+
+    print(f"Built {len(patches)} patches, each with exactly {k} cells.")
+    
+    # Call the bar graph function to visualize the distribution of the created patches.
+    # The 'mask' here ensures the bar graph considers only the cells that were eligible.
+    bar_graph_cluster_distribution(labels_full, mask=mask, algorithm="lon_spilldown")
+
+    # Return the full labels array, the list of patch index arrays, and the representative lat/lons
+    return labels_full, patches, np.array(patch_latlons)
+
 def patchify_by_latlon_spillover(latCell, lonCell, k=49, max_patches=727, lat_threshold=40.0):
     """
     Create spatially coherent patches based on sorted lat/lon without clustering.
@@ -64,10 +270,13 @@ def patchify_by_latlon_spillover(latCell, lonCell, k=49, max_patches=727, lat_th
 
     Returns
     -------
-    patches : List[np.ndarray]
-        List of patches, each a list of cell indices (np.ndarray of ints).
     labels_full : np.ndarray
         Array of shape (nCells,) giving patch ID or -1 if unassigned.
+    patches : List[np.ndarray]
+        List of patches, each a list of cell indices (np.ndarray of ints).
+    patch_latlons : np.ndarray
+        Array of shape (n_patches, 2) containing (latitude, longitude) for one
+        representative cell per patch.
     """
 
     nCells = len(latCell)
@@ -83,13 +292,20 @@ def patchify_by_latlon_spillover(latCell, lonCell, k=49, max_patches=727, lat_th
     sorted_indices = indices[sort_order]
 
     patches = []
+    patch_latlons = []  # List to store (lat, lon) for each patch
     labels_full = np.full(nCells, -1, dtype=int)
     patch_id = 0
     current_patch = []
+    
+    # Variable to store the lat/lon of the first cell in the current patch
+    current_patch_first_latlon = None 
 
     for idx in sorted_indices:
         if used[idx]:
             continue
+
+        if not current_patch:  # If this is the first cell in a new patch
+            current_patch_first_latlon = (latCell[idx], lonCell[idx])
 
         current_patch.append(idx)
         used[idx] = True
@@ -97,27 +313,35 @@ def patchify_by_latlon_spillover(latCell, lonCell, k=49, max_patches=727, lat_th
         if len(current_patch) == k:
             patches.append(np.array(current_patch, dtype=int))
             labels_full[current_patch] = patch_id
+            patch_latlons.append(current_patch_first_latlon) # Add the lat/lon of the first cell
             patch_id += 1
             current_patch = []
+            current_patch_first_latlon = None # Reset for the next patch
 
             if patch_id >= max_patches:
                 break
 
-    # Optionally add a final partial patch
+    # Add a final partial patch
     if current_patch and patch_id < max_patches:
         patches.append(np.array(current_patch, dtype=int))
         labels_full[current_patch] = patch_id
+        # If there's a leftover patch, its first cell's lat/lon was already captured
+        if current_patch_first_latlon is not None:
+             patch_latlons.append(current_patch_first_latlon)
+        else:
+            # Fallback if somehow current_patch_first_latlon was not set for the last patch
+            patch_latlons.append((latCell[current_patch[0]], lonCell[current_patch[0]]))
 
     print(f"Built {len(patches)} patches of size ~{k}")
     
     # Flatten and relabel for visualization
-    labels_full = np.full(len(latCell), -1)
+    labels_full_final = np.full(len(latCell), -1)
     for i, inds in enumerate(patches):
-        labels_full[inds] = i
+        labels_full_final[inds] = i
     
-    bar_graph_cluster_distribution(labels_full, mask=np.ones_like(latCell, dtype=bool), algorithm="latlon_spillover")
+    bar_graph_cluster_distribution(labels_full_final, mask=np.ones_like(latCell, dtype=bool), algorithm="latlon_spillover")
 
-    return labels_full, patches
+    return labels_full_final, patches, np.array(patch_latlons)
 
 def patchify_with_spillover(latCell, patch_size=49, 
                             min_lat=40, max_lat=90, 
