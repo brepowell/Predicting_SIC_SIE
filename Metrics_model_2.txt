@@ -10,7 +10,6 @@ DEBUG: len(test_set): 54 Days
 DEBUG: len(dataset) for splitting: 356 Days
 DEBUG: train_end: 249
 DEBUG: val_end: 302
-DEBUG: total_days for Subset: 356 Days
 DEBUG: range for test_set: range(302, 356)
 ==================
 Processing batch 1/3
@@ -19,7 +18,15 @@ Processing batch 3/3
 
 --- Error Metrics (Averaged per Cell per Patch) ---
 Mean Absolute Error (shape torch.Size([140, 256])):
-Overall Mean Absolute Error: 0.2267
+Overall Mean Absolute Error:            0.2267
 
 Mean Squared Error (shape torch.Size([140, 256])):
-Overall Mean Squared Error: 0.0956
+Overall Mean Squared Error:             0.0956
+Overall Root Mean Squared Error (RMSE): 0.3092547592430598
+
+Total predicted values collected: 5160960
+Total actual values collected: 5160960
+
+Jensen-Shannon Distance between actual and predicted histograms: 0.6764
+
+Evaluation complete.
