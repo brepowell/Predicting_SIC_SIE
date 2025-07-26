@@ -53,18 +53,28 @@ def animate_patch_reveal(latCell, lonCell, patch_indices, dot_size=DOT_SIZE,
     lon_filtered = lonCell[mask]
     patch_id = patch_indices[mask]
 
+    if len(patch_id) == 0:
+        print("No valid patches to animate after filtering. Check LAT_LIMIT and patch_indices.")
+        return
+
     max_patch_id = patch_id.max()
+    print(f"Calculated max_patch_id: {max_patch_id}")
+    print(f"Unique patch_ids in filtered data: {np.unique(patch_id)}")
+
     base_cmap = get_cmap("flag")
     all_colors = [base_cmap(i / (max_patch_id + 1)) for i in range(max_patch_id + 1)]
     cmap = ListedColormap(all_colors)
 
     frames = []
 
-    for max_index in range(0, max_patch_id + 1, step):
+    # Ensure the last frame always includes max_patch_id
+    for max_index_limit in range(0, max_patch_id + step, step):
+        current_max_index = min(max_index_limit, max_patch_id)
+        
         fig = plt.figure(figsize=(8, 6))
         fig.subplots_adjust(bottom=0.07, top=0.85,
-                        left=0.04, right=0.95,
-                        wspace=0.02, hspace=0.12)
+                            left=0.04, right=0.95,
+                            wspace=0.02, hspace=0.12)
         ax = plt.axes(projection=ccrs.NorthPolarStereo(central_longitude=270, globe=None))
         ax.set_extent([MINLONGITUDE, MAXLONGITUDE, LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
         add_map_features(ax)
@@ -72,28 +82,37 @@ def animate_patch_reveal(latCell, lonCell, patch_indices, dot_size=DOT_SIZE,
         add_polar_labels(ax, hemisphere='north')
 
         # Mask to only show patches up to the current frame's limit
-        frame_mask = patch_id <= max_index
-        sc = ax.scatter(lon_filtered[frame_mask], lat_filtered[frame_mask],
-                        s=dot_size,
-                        c=patch_id[frame_mask],
-                        cmap=cmap,
-                        vmin=0,
-                        vmax=max_patch_id,
-                        transform=ccrs.PlateCarree())
+        frame_mask = patch_id <= current_max_index
+        
+        # Only plot if there are points to plot in this frame
+        if np.any(frame_mask):
+            sc = ax.scatter(lon_filtered[frame_mask], lat_filtered[frame_mask],
+                            s=dot_size,
+                            c=patch_id[frame_mask],
+                            cmap=cmap,
+                            vmin=0,
+                            vmax=max_patch_id,
+                            transform=ccrs.PlateCarree())
 
-        ax.set_title(f"Patches 0 to {max_index}")
+        ax.set_title(f"Patches 0 to {current_max_index}")
         ax.axis('off')
-        plt.suptitle("Mesh Patches - Ascending by Patch Index", fontsize="x-large", fontweight="bold")
+        plt.suptitle(gif_path, fontsize="x-large", fontweight="bold")
 
         # Save frame
-        frame_path = os.path.join(output_dir, f"frame_{max_index:03d}.png")
+        frame_path = os.path.join(output_dir, f"frame_{current_max_index:03d}.png")
         plt.savefig(frame_path)
         plt.close(fig)
 
         if save_gif:
             frames.append(imageio.imread(frame_path))
+            
+        # Optional: Print progress for debugging
+        print(f"Generated frame for max_index: {current_max_index}")
+
 
     # Assemble GIF if requested
-    if save_gif:
-        imageio.mimsave(gif_path, frames, duration=0.2)  # duration is seconds per frame
+    if save_gif and frames: # Ensure there are frames to save
+        imageio.mimsave(gif_path, frames, duration=1.5)  # duration is seconds per frame
         print(f"GIF saved to {gif_path}")
+    elif save_gif and not frames:
+        print("No frames were generated for the GIF.")

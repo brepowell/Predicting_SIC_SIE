@@ -49,15 +49,15 @@ def add_map_features(my_map, oceanFeature=OCEANFEATURE, landFeature=LANDFEATURE,
 
 def add_polar_labels(ax, hemisphere='north'):
     gl = ax.gridlines(draw_labels=True, linestyle='--', color='gray', alpha=0.5)
-    gl.xlabels_top = False
-    gl.xlabels_bottom = False
-    gl.ylabels_left = False
-    gl.ylabels_right = False
+    gl.top_labels = False
+    gl.bottom_labels = False
+    gl.left_labels = False    
+    gl.right_labels = False
     gl.xlabel_style = {'size': 8}
 
     # Enable longitude labels (around the circle)
     if hemisphere == 'north':
-        gl.xlabels_top = True  # show on top
+        gl.top_labels = True  # show on top
     elif hemisphere == 'south':
         gl.xlabels_bottom = True  # show on bottom
 
@@ -125,8 +125,8 @@ def generate_axes_all_projections():
     return fig, [ax1, ax2, ax3, ax4, ax5, ax6]
 
 
-def map_hemisphere_north(latCell, lonCell, variableToPlot1D, title, hemisphereMap, dot_size=DOT_SIZE):
-    """ Map the northern hemisphere onto a matplotlib figure. 
+def _map_hemisphere_north(latCell, lonCell, variableToPlot1D, title, hemisphereMap, dot_size=DOT_SIZE):
+    """ Helper Function: Map the northern hemisphere onto a matplotlib figure. 
     This requires latCell and lonCell to be filled by a mesh file.
     It also requires variableToPlot1D to be filled by an output .nc file. 
     Returns a scatter plot. """
@@ -143,8 +143,8 @@ def map_hemisphere_north(latCell, lonCell, variableToPlot1D, title, hemisphereMa
 
     return sc
 
-def map_hemisphere_southern(latCell, lonCell, variableToPlot1D, title, hemisphereMap, dot_size=DOT_SIZE):
-    """ Map one hemisphere onto a matplotlib figure. 
+def _map_hemisphere_southern(latCell, lonCell, variableToPlot1D, title, hemisphereMap, dot_size=DOT_SIZE):
+    """ Helper Function: Map one hemisphere onto a matplotlib figure. 
     You do not need to include the minus sign for lower latitudes. 
     This requires latCell and lonCell to be filled by a mesh file.
     It also requires variableToPlot1D to be filled by an output .nc file. 
@@ -186,9 +186,8 @@ def map_lats_lons_one_color(fig, latCell, lonCell, hemisphereMap, dot_size=DOT_S
 
     plt.suptitle("Mesh", size="x-large", fontweight="bold")
 
-    # Save the maps as an image
+    # Save the map as an image
     plt.savefig("mesh_pink.png")
-
     plt.close(fig)
 
     return sc
@@ -475,8 +474,6 @@ def map_patches_by_index(fig, latCell, lonCell, patch_indices, hemisphereMap, do
 
     return sc
 
-PATCH_SIZE = 49          # 49 cells per patch
-
 def map_patches_by_index_binned(fig,
                                 latCell, lonCell,            # 1-D numpy arrays
                                 patch_indices,               # 0 … len(latCell)-1
@@ -540,7 +537,7 @@ def map_patches_by_index_binned(fig,
     # --------- titles & save -----------------------------------
     hemisphereMap.set_title(f"Mesh – {n_patches} patches ({cells_per_cluster} cells each)")
     hemisphereMap.axis('off')
-    plt.suptitle("Mesh by Patch", size="x-large", fontweight="bold")
+    plt.suptitle(f"Patchify w/ {algorithm}", size="x-large", fontweight="bold")
     plt.savefig(f"mesh_patches_binned_{algorithm}_size_{cells_per_cluster}_.png")
     plt.close(fig)
 
@@ -549,7 +546,7 @@ def map_patches_by_index_binned(fig,
 def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, variableToPlot1D, mapImageFileName, 
                                   colorBarOn=COLORBARON, grid=GRIDON,
                                   oceanFeature=OCEANFEATURE, landFeature=LANDFEATURE, 
-                                  coastlines=COASTLINES, dot_size=DOT_SIZE, textBoxString=""):
+                                  coastlines=COASTLINES, dot_size=DOT_SIZE, textBoxString="", suptitle_year = False):
     """ Generate 2 maps; one of the north pole and one of the south pole. """
 
     # Adjust the margins around the plots (as a fraction of the width or height).
@@ -571,8 +568,8 @@ def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, var
     southMap.set_boundary(make_circle(), transform=southMap.transAxes)
 
     # Map the 2 hemispheres.
-    northPoleScatter = map_hemisphere_north(latCell, lonCell, variableToPlot1D, "Arctic Sea Ice", northMap, dot_size=dot_size)
-    southPoleScatter = map_hemisphere_southern(latCell, lonCell, variableToPlot1D, "Antarctic Sea Ice", southMap, dot_size=dot_size)
+    northPoleScatter = _map_hemisphere_north(latCell, lonCell, variableToPlot1D, "Arctic Projection", northMap, dot_size=dot_size)
+    southPoleScatter = _map_hemisphere_southern(latCell, lonCell, variableToPlot1D, "Antarctic Projection", southMap, dot_size=dot_size)
     
     # Add the timestamp to the North Map on the left side
     if textBoxString != "":    
@@ -585,11 +582,15 @@ def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, var
         plt.colorbar(southPoleScatter, ax=southMap)
 
     # Add the bold title at the top
-    plt.suptitle(suptitle_variable_year(), size="x-large", fontweight="bold")
+    if suptitle_year:
+        # Title it with the year of the data
+        plt.suptitle(suptitle_variable_year(), size="x-large", fontweight="bold")
+    else:
+        # Title it with the plot name
+        plt.suptitle(mapImageFileName, size="x-large", fontweight="bold")
 
-    # Save the maps as an image
+    # Save the map as an image
     plt.savefig(mapImageFileName)
-
     plt.close(fig)
 
     return northPoleScatter, southPoleScatter
@@ -597,7 +598,7 @@ def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, var
 def generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1D, mapImageFileName, 
                          colorBarOn=COLORBARON, grid=GRIDON,
                          oceanFeature=OCEANFEATURE, landFeature=LANDFEATURE, 
-                         coastlines=COASTLINES, dot_size=DOT_SIZE):
+                         coastlines=COASTLINES, dot_size=DOT_SIZE, suptitle_year = False):
     """ Generate one map of the north pole. No timestamp. """
 
     print("--- starting to make a map of the Arctic ---")
@@ -617,13 +618,19 @@ def generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1D, m
     northMap.set_boundary(make_circle(), transform=northMap.transAxes)
 
     # Map the hemisphere
-    scatter = map_hemisphere_north(latCell, lonCell, variableToPlot1D, f"Arctic Sea Ice", northMap, dot_size)     # Map northern hemisphere
+    scatter = _map_hemisphere_north(latCell, lonCell, variableToPlot1D, f"Arctic Projection", northMap, dot_size)     # Map northern hemisphere
     
     # Set Color Bar - make sure this is the last thing you add to the map!
     if colorBarOn:
         plt.colorbar(scatter, ax=northMap)
 
-    plt.suptitle(suptitle_variable_year(), size="x-large", fontweight="bold")
+    # Add the bold title at the top
+    if suptitle_year:
+        # Title it with the year of the data
+        plt.suptitle(suptitle_variable_year(), size="x-large", fontweight="bold")
+    else:
+        # Title it with the plot name
+        plt.suptitle(mapImageFileName, size="x-large", fontweight="bold")
 
     # Save the maps as an image.
     plt.savefig(mapImageFileName)
