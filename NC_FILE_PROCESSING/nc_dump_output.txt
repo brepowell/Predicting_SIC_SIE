@@ -1,0 +1,26 @@
+netcdf v3.LR.historical_0051.mpassi.hist.am.timeSeriesStatsDaily.2024-12-01 {
+dimensions:
+	Time = UNLIMITED ; // (31 currently)
+	StrLen = 64 ;
+	nCells = 465044 ;
+	nVertices = 942873 ;
+variables:
+	int timeDaily_counter(Time) ;
+	char xtime_startDaily(Time, StrLen) ;
+	char xtime_endDaily(Time, StrLen) ;
+	float timeDaily_avg_iceAreaCell(Time, nCells) ;
+		timeDaily_avg_iceAreaCell:units = "1" ;
+		timeDaily_avg_iceAreaCell:standard_name = "sea_ice_area_fraction" ;
+		timeDaily_avg_iceAreaCell:long_name = "Fraction of grid cell covered in sea ice" ;
+	float timeDaily_avg_iceVolumeCell(Time, nCells) ;
+		timeDaily_avg_iceVolumeCell:units = "m" ;
+		timeDaily_avg_iceVolumeCell:long_name = "Ice volume per unit area of grid cell" ;
+	float timeDaily_avg_snowVolumeCell(Time, nCells) ;
+		timeDaily_avg_snowVolumeCell:units = "m" ;
+		timeDaily_avg_snowVolumeCell:long_name = "Snow volume per unit area of grid cell" ;
+	float timeDaily_avg_uVelocityGeo(Time, nVertices) ;
+		timeDaily_avg_uVelocityGeo:units = "m s-1" ;
+		timeDaily_avg_uVelocityGeo:long_name = "True eastwards ice velocity" ;
+	float timeDaily_avg_vVelocityGeo(Time, nVertices) ;
+		timeDaily_avg_vVelocityGeo:units = "m s-1" ;
+		timeDaily_avg_vVelocityGeo:long_name = "True northwards ice velocity" ;

@@ -43,7 +43,8 @@ def gather_files(useFullPath=True, path=None):
     return sorted(all_nc_files)
 
 def validate_path(directory_or_full_path, file_name=""):
-    """ Take in a directory or full path and a file name. Check if the path leads to a .nc file. Return the full path. """
+    """ Take in a directory or full path and a file name. 
+    Check if the path leads to a .nc file. Return the full path. """
     
     if directory_or_full_path == "":
         raise ValueError("The first parameter in load_mesh needs to be a directory or an .nc file")

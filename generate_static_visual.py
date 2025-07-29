@@ -15,7 +15,7 @@ def main():
     ####################################################
     print("Days total: ", get_number_of_days(output, keyVariableToPlot=VARIABLETOPLOT))
 
-    variableToPlot1Day = reduce_to_one_dimension(output, keyVariableToPlot=VARIABLETOPLOT, dayNumber=1)
+    variableToPlot1Day = reduce_to_one_dimension(output, keyVariableToPlot=VARIABLETOPLOT, dayNumber=13)
     
     ##############################
     # PLOTTING MY NEW.NC RESULTS #
@@ -30,7 +30,7 @@ def main():
     ###################
     fig, northMap = generate_axes_north_pole()
 
-    mapImageFileName = generate_static_map_png_file_name(outputFileName)
+    mapImageFileName = generate_static_map_png_file_name(outputFileName, day=13)
 
     # Plotting with a variable
     generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1Day, mapImageFileName)

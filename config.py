@@ -14,10 +14,13 @@ from perlmutterpath import *
 # Change these for different runs if you want to narrow down your focus
 VARIABLETOPLOT     = "timeDaily_avg_iceAreaCell"   # The variable to plot from the E3SM data
 VARIABLETOPLOTSHORTNAME = "Daily SIC"
+# VARIABLETOPLOT     = "timeDaily_avg_iceVolumeCell"
+# VARIABLETOPLOTSHORTNAME = "Daily Ice Volume"
 
 #print("Plotting this variable: ", VARIABLETOPLOT)
 
-#VARIABLETOPLOT      = "freeboard"                   # The variable to plot from the satellite data
+#### SATELLITE VARIABLE DATA #####
+#VARIABLETOPLOT      = "freeboard"                
 #VARIABLETOPLOT      = "samplemf" # make sure to set VMAX
 #VARIABLETOPLOT      = "sampleof"
 #VARIABLETOPLOT       = "meanof"
@@ -50,9 +53,10 @@ LAT_LIMIT       =  50  # Good wide view for the north and south poles for E3SM d
 #LAT_LIMIT        =  80  # Extreme closeup for the freeboard of one satellite track
 
 # Change if you want larger or smaller dots for the scatterplot
-#DOT_SIZE        = 0.4  # Good for the ice area variable
+DOT_SIZE        = 0.4  # Good for the ice area variable
 #DOT_SIZE        = 7.0  # Good for satellite tracks
-DOT_SIZE        = 0.05 # Good for mesh
+#DOT_SIZE         = 20   # FOR OUTLIER
+#DOT_SIZE        = 0.05 # Good for mesh
 
 # Change if you want to downsample the amount of data by a certain factor
 DEFAULT_DOWNSAMPLE_FACTOR = 100
@@ -61,6 +65,7 @@ DEFAULT_DOWNSAMPLE_FACTOR = 100
 VMIN = 0
 VMAX = 1      # Good for Ice Area
 #VMAX = 0.7    # Good for Freeboard
+#VMAX = 8       # outlier
 #VMAX = 150    # samplemf for ALL FILES - the max is 295, but there are not many cells that go above 150 samples; 100 is too low
 #VMAX = 25     # samplemf for spring 2003 - there are not many cells that go above 45 samples;
 #VMAX = 15000  # sampleof for ALL FILES - the max is 46893, but there are not that many tracks that go about 15000 samples; 20000 looks ok 
@@ -79,7 +84,6 @@ INTERVALS = 500 # good for smaller animations, like 5 to 10 days
 #  File Paths  #
 ################
 
-#runDir = ""
 #runDir         = os.path.dirname(os.path.abspath(__file__))       # Get current directory path
 runDir = perlmutterpath2 # For perlmutter (PM) only
 
@@ -95,7 +99,7 @@ SYNCH_FILE_NAME = r"/mesh_files/E3SM_IcoswISC30E3r5_ICESat_Orbital_Synchronizer.
 
 # outputFileName = r"/10yrFebruaryExample.nc"
 
-outputFileName = r"/NC_FILE_PROCESSING/v3.LR.DTESTM.pm-cpu-10yr.mpassi.hist.am.timeSeriesStatsDaily.0010-01-01.nc"
+#outputFileName = r"/NC_FILE_PROCESSING/v3.LR.DTESTM.pm-cpu-10yr.mpassi.hist.am.timeSeriesStatsDaily.0010-01-01.nc"
 
 #outputFileName = r"\output_files\Breanna_D_test_1x05_days.mpassi.hist.am.timeSeriesStatsDaily.0001-01-01.nc"  # 5-day Ice Area
 #outputFileName = r"\output_files\Breanna_D_test_1x10_days.mpassi.hist.am.timeSeriesStatsDaily.0001-01-01.nc"  # 10-day Ice Area
@@ -117,7 +121,7 @@ FULL_PATH = runDir + subdirectory
 
 # Change these to save without overwriting your files
 #animationFileName = f"E3SM_2003_5_months_simulation.gif"
-#mapImageFileName = f"static_image.png"
+mapImageFileName = f"static_image.png"
 
 
 #animationFileName   = f"{VARIABLETOPLOT}_{SEASON}_2003_to_{YEAR}.gif"                # Should be a .gif extension
