@@ -4,7 +4,6 @@ from MAP_ANIMATION_GENERATION.map_label_utility_functions import *
 from MAP_ANIMATION_GENERATION.map_animation_utility_functions import * 
 from config import *
 
-
 def plot_mesh_indices(latCell, lonCell):
     
     fig, northMap = generate_axes_north_pole() 
@@ -40,6 +39,26 @@ def plot_mesh(latCell, lonCell, mask):
 
 def main():
     
+    # --- Define Patchify Functions Dictionary ---
+    PATCHIFY_FUNCTIONS = {
+        "latlon_spillover": patchify_by_latlon_spillover,
+        "staggered_polar_descent": patchify_staggered_polar_descent,
+        "lon_spilldown": patchify_by_lon_spilldown,
+        "latitude_spillover_redo": patchify_with_spillover,
+        "latitude_simple": patchify_by_latitude_simple,
+        "latitude_neighbors": patchify_by_latitude,
+        "breadth_first_improved_padded": build_patches_from_seeds_improved_padded,
+        "breadth_first_bfs_basic": build_patches_from_seeds_bfs_basic,
+        "agglomerative": compute_agglomerative_patches,
+        "knn_disjoint": compute_disjoint_knn_patches,
+        "knn_basic": compute_knn_patches,
+        "kmeans": cluster_patches_kmeans,
+        "rows": get_rows_of_patches,
+        "dbscan": get_clusters_dbscan
+    }
+
+    cellsOnCell = np.load(f'cellsOnCell.npy')
+    
     # Load the mesh and data to plot.
     latCell, lonCell = load_mesh(perlmutterpathMesh)
     print("nCells:             ", len(latCell))
@@ -52,49 +71,64 @@ def main():
     print("mask size:          ", masked_ncells_size)
     
     cells_per_patch = 256
-    n_patches = masked_ncells_size // cells_per_patch
+    num_patches = masked_ncells_size // cells_per_patch
 
     print("cells_per_patch:    ", cells_per_patch)
-    print("n_patches:          ", n_patches)
+    print("num_patches:          ", num_patches)
 
     print("=== SET INITIAL VARIABLES === ")
     
-    # Different patching techniques
-    # labels_full, patches, patch_latlons, algorithm = cluster_patches_kmeans(latCell, lonCell, latitude_threshold) # Patching in clusters, like k-means
-    # labels_full, patches, patch_latlons, algorithm = get_rows_of_patches(latCell, lonCell, latitude_threshold) # Patching in rows or stripes
-    # labels_full, patches, patch_latlons, algorithm = get_clusters_dbscan(latCell, lonCell, latitude_threshold, cells_per_patch)
-    # labels_full, patches, patch_latlons, algorithm = compute_knn_patches(latCell, lonCell, latitude_threshold, cells_per_patch, n_patches, seed=42)
-    # labels_full, patches, patch_latlons, algorithm = compute_disjoint_knn_patches(latCell, lonCell, latitude_threshold, cells_per_patch, n_patches, seed=42)
-    # labels_full, patches, patch_latlons, algorithm = compute_agglomerative_patches(latCell, lonCell, latitude_threshold, n_patches)
-    # labels_full, patches, patch_latlons, algorithm = patchify_by_latitude(latCell, lonCell, patch_size=cells_per_patch, min_lat=latitude_threshold, max_lat=90, step_deg=3, seed=42)
-    # labels_full, patches, patch_latlons, algorithm = patchify_by_latitude_simple(latCell, patch_size=cells_per_patch, min_lat=latitude_threshold, max_lat=90, step_deg=3, seed=42)    
-    #labels_full, patches, patch_latlons, algorithm = patchify_with_spillover(latCell, patch_size=cells_per_patch, min_lat=latitude_threshold, max_lat=90, step_deg=3, max_patches=n_patches, seed=42)
-    # labels_full, patches, patch_latlons, algorithm = patchify_by_latlon_spillover(latCell, lonCell, k=cells_per_patch, max_patches=n_patches, latitude_threshold=latitude_threshold)
-    # labels_full, patches, patch_latlons, algorithm = patchify_by_lon_spilldown(latCell, lonCell, k=cells_per_patch, max_patches=n_patches, latitude_threshold=latitude_threshold)
-    #labels_full, patches, patch_latlons, algorithm = patchify_staggered_polar_descent(latCell, lonCell, k=cells_per_patch, max_patches=n_patches, latitude_threshold=latitude_threshold)
+    # --- Common Parameters for all functions ---
+    common_params = {
+        "latCell": latCell,
+        "lonCell": lonCell,
+        "cells_per_patch": cells_per_patch, 
+        "num_patches": num_patches,
+        "latitude_threshold": latitude_threshold,
+        "seed": 42
+    }
 
-    # Breadth-first or spectral clustering algorithms based on cellsOnCell adjacency lists
-    cellsOnCell = np.load(f'cellsOnCell.npy')
-    #labels_full, patches, patch_latlons, algorithm = build_patches_from_seeds(cellsOnCell, latCell, lonCell, n_patches=n_patches, patch_size=cells_per_patch, seed=42, mask=mask)
-    #labels_full, patches, patch_latlons, algorithm = build_patches_from_seeds_improved(cellsOnCell, n_patches=n_patches, patch_size=cells_per_patch, seed=42, mask=mask, pad_to_exact_size=False)
-    labels_full, patches, patch_latlons, algorithm = build_patches_from_seeds_priority(cellsOnCell, latCell, lonCell, mask=mask)
-    
-    # --- options for visual
-    # Gradient Patches
-    # fig, northMap = generate_axes_north_pole()
-    # map_patches_by_index(fig, latCell, lonCell, labels_full, northMap)
+    # --- Function-specific Parameters (if any) ---
+    specific_params = {
+        "latitude_spillover_redo": {"step_deg": 5, "max_lat": 90},
+        "latitude_simple": {"step_deg": 5, "max_lat": 90},
+        "latitude_neighbors": {"step_deg": 5, "max_lat": 90},
+        "breadth_first_improved_padded": {"cellsOnCell": cellsOnCell, "pad_to_exact_size": True},
+        "breadth_first_bfs_basic": {"cellsOnCell": cellsOnCell},
+        "agglomerative": {"n_neighbors": 5},
+    }
 
-    # Multicolored Patches
-    fig, northMap = generate_axes_north_pole()
-    map_patches_by_index_binned(fig,
-                                latCell, lonCell, labels_full,   # 1-D numpy arrays
-                                northMap,
-                                n_patches, cells_per_patch,
-                                algorithm = algorithm, 
-                                color_map="flag", 
-                                )
+    # --- Run Tests ---
+    for name, func in PATCHIFY_FUNCTIONS.items():
+        print(f"\n--- Testing '{name}' ---")
+        params = common_params.copy()
+        params.update(specific_params.get(name, {})) # Add function-specific params
 
-    animate_patch_reveal(latCell, lonCell, labels_full, gif_path=f"patch_animation_{algorithm}.gif")
+        try:
+            labels_full, patch_indices, patch_latlons, algorithm_name = func(**params)
+            print(f"  SUCCESS: {algorithm_name} produced {len(patch_indices)} patches.")
+            print(f"  First patch indices: {patch_indices[0] if patch_indices else 'N/A'}")
+            print(f"  First patch lat/lon: {patch_latlons[0] if patch_latlons.shape[0] > 0 else 'N/A'}")
+            print(f"  Labels full shape: {labels_full.shape}")
+
+            # Multicolored Patches
+            # fig, northMap = generate_axes_north_pole()
+            # map_patches_by_index_binned(fig,
+            #                             latCell, lonCell, labels_full,   # 1-D numpy arrays
+            #                             northMap,
+            #                             num_patches, cells_per_patch,
+            #                             algorithm = algorithm_name, 
+            #                             color_map="flag", 
+            #                     )
+            
+            # animate_patch_reveal(latCell, lonCell, labels_full, gif_path=f"patch_animation_{algorithm_name}.gif")
+            
+        except Exception as e:
+            print(f"  FAILURE: {name} failed with error: {e}")
+            import traceback
+            traceback.print_exc() # Print full traceback for debugging
+
+    print("\n--- All Patchify Function Tests Completed ---")
     
 if __name__ == "__main__":
     main()
