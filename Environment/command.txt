@@ -19,11 +19,16 @@ conda env create --prefix /global/common/software/m4572/rapids_pytorch_xarray_ca
 
 # CREATE AN ENVIRONMENT in scratch
 conda env create --prefix /pscratch/sd/b/brelypo/conda_env/rapids_pytorch_xarray_cartopy_papermill -f environment.yml
+conda env create --prefix /pscratch/sd/b/brelypo/conda_env/sic_sie_env -f environment.yml
 
 # ACTIVATE AN ENVIRONMENT
 conda activate /global/common/software/m4572/rapids_pytorch_xarray_cartopy_papermill
 conda activate /pscratch/sd/b/brelypo/conda_env/rapids_pytorch_xarray_cartopy_papermill
 
+# ALWAYS ALWAYS ALWAYS USE THIS AGAIN - AFTER ADDING AN ENVIRONMENT!!!!!
+conda clean -a
+
 # CREATE A KERNEL
 python -m ipykernel install --user --name rapids_pytorch_xarray_cartopy_papermill --display-name "Rapids PyTorch Xarray Cartopy Papermill"
+python -m ipykernel install --user --name sic_sie_env --display-name "SIC SIE Kernel"
 
