@@ -2,15 +2,28 @@
 
 module load python
 conda deactivate
-conda remove --name sic_sie_env --all -y
+conda env list
+conda env remove -n <env>
 
-# CREATE AN ENVIRONMENT
+# REMOVE OLD ENVIRONMENT in scratch
+conda env remove -f /pscratch/sd/b/brelypo/conda_env/rapids_pytorch_xarray_cartopy_papermill
+
+# ALWAYS ALWAYS ALWAYS USE THIS AFTER REMOVING AN ENVIRONMENT!!!!!
+conda clean -a
+
+# CREATE AN ENVIRONMENT in home
 conda env create -f sic_sie_env.yml
-conda activate sic_sie_env
+
+# CREATE AN ENVIRONMENT in global common area
+conda env create --prefix /global/common/software/m4572/rapids_pytorch_xarray_cartopy_papermill -f environment.yml
+
+# CREATE AN ENVIRONMENT in scratch
+conda env create --prefix /pscratch/sd/b/brelypo/conda_env/rapids_pytorch_xarray_cartopy_papermill -f environment.yml
+
+# ACTIVATE AN ENVIRONMENT
+conda activate /global/common/software/m4572/rapids_pytorch_xarray_cartopy_papermill
+conda activate /pscratch/sd/b/brelypo/conda_env/rapids_pytorch_xarray_cartopy_papermill
 
 # CREATE A KERNEL
-python -m ipykernel install --user --name sic_sie_env --display-name "Sea Ice Classifier"
+python -m ipykernel install --user --name rapids_pytorch_xarray_cartopy_papermill --display-name "Rapids PyTorch Xarray Cartopy Papermill"
 
-
-module load python
-conda list ipympl

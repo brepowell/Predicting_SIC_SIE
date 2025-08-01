@@ -1,0 +1,66 @@
+# ACCELERATED ENVIRONMENT - DOESN'T WORK - TRY AGAIN LATER
+
+# IMPORTANT: IF YOU HAVE TO MAKE AN EDIT TO THE ENVIRONMENT, THEN IT'S BEST TO TOTALLY REMOVE THE ENVIRONMENT FIRST
+# OTHERWISE, IT DOES AN ENVIRONMENT SOLVE, WHICH INVOLVES DOWNLOADING NEW PACKAGE LISTS
+# LONG STORY SHORT, NEVER USE UNINSTALL
+
+# name: rapids_pytorch_xarray_cartopy_papermill
+# channels:
+#   - rapidsai
+#   - nvidia
+#   - pytorch
+#   - conda-forge
+#   - defaults
+# dependencies:
+#   # Use the Python version recommended by the RAPIDS tool
+#   - python=3.13
+
+#   # Install RAPIDS 25.06, which will pull in the correct CUDA dependencies
+#   - rapids=25.06
+
+#   # Explicitly pin the CUDA Toolkit version to avoid library conflicts
+#   - cuda-toolkit=12.0
+
+#   # Explicitly include the CUDA runtime library for UCX
+#   # UCX needs this to enable its full GPU functionality
+#   - cuda-cudart
+
+#   # PyTorch GPU-enabled build. Use a version known to be compatible with RAPIDS 25.06
+#   - pytorch=*=*cuda*
+#   - torchvision
+#   - torchaudio
+
+#   # Core packages
+#   - numpy # <-- Let the rapids=25.06 meta-package handle the versioning
+#   - pandas
+#   - xarray
+#   - matplotlib
+#   - netcdf4
+#   - scipy
+#   - dask
+#   - ipykernel
+#   - cartopy
+#   - papermill
+
+# ORIGINAL ENVIRONMENT
+name: sic_sie_env
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - pandas
+  - xarray
+  - matplotlib
+  - pytorch
+  - torchvision
+  - torchaudio
+  - netcdf4
+  - scipy
+  - dask
+  - ipykernel
+  - cartopy # Added 
+  - papermill #Added
+
