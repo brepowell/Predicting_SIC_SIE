@@ -23,22 +23,48 @@ def generate_daily_pngs_from_one_nc_file_with_multiple_days():
 
     fig, northMap, southMap = generate_axes_north_and_south_pole()
 
-    # TODO - MAKE THIS RUN IN PARALLEL
-    #for i in range(days):
-    i = 0
-    # Get the time for this day
-    textBoxString = "Time: " + str(timeList[i])
+    # List to store the paths of the generated PNG frames
+    frames_for_gif = []
     
-    variableForOneDay = reduce_to_one_dimension(output, keyVariableToPlot=VARIABLETOPLOT, dayNumber=i)
-    
-    mapImageFileName = generate_static_map_png_file_name(outputFileName, day=i+1)
-    
-    generate_maps_north_and_south(fig, northMap, southMap, 
-                                                                       latCell, lonCell, variableForOneDay, 
-                                                                       mapImageFileName,
-                                                                       textBoxString=textBoxString)
-    print("Saved file: ", mapImageFileName)
+    # Create a directory to store the frames
+    output_dir = "daily_frames"
+    os.makedirs(output_dir, exist_ok=True)
 
+    # Loop through each day to generate a separate image
+    for i in range(days):
+        
+        # Get the time for this day
+        textBoxString = "Time: " + str(timeList[i])
+        
+        variableForOneDay = reduce_to_one_dimension(output, keyVariableToPlot=VARIABLETOPLOT, dayNumber=i)
+        
+        # Generate a unique file name for each frame
+        mapImageFileName = os.path.join(output_dir, generate_static_map_png_file_name(outputFileName, day=i + 1))
+        
+        fig, northMap, southMap = generate_axes_north_and_south_pole()
+        
+        generate_maps_north_and_south(fig, northMap, southMap,
+                                      latCell, lonCell, variableForOneDay,
+                                      mapImageFileName,
+                                      textBoxString=textBoxString)
+        
+        plt.close(fig) # Close the figure to free up memory
+        
+        print("Saved file: ", mapImageFileName)
+        frames_for_gif.append(mapImageFileName)
+    
+    # After the loop, create the GIF from the saved frames
+    if frames_for_gif:
+        gif_path = f"daily_animation_{outputFileName}.gif" # Name of the final GIF
+        print(f"Creating GIF at {gif_path}...")
+        
+        # Read the images and create the GIF
+        images = [imageio.imread(frame) for frame in frames_for_gif]
+        imageio.mimsave(gif_path, images, fps=5) # 'fps' is frames per second
+        
+        print(f"GIF saved to {gif_path}")
+    else:
+        print("No frames were generated to create the GIF.")
 
 def animate_patch_reveal(latCell, lonCell, patch_indices, dot_size=DOT_SIZE,
                          output_dir="frames", gif_path="patch_animation.gif",

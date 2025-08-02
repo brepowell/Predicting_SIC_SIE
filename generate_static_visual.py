@@ -3,6 +3,19 @@ from MAP_ANIMATION_GENERATION.map_gen_utility_functions import *
 from MAP_ANIMATION_GENERATION.map_label_utility_functions import *
 from config import *
 
+def static_image_no_time_label(latCell, lonCell, variableToPlot1Day):
+    ###################
+    # ARTIC-ONLY PLOT #
+    ###################
+    fig, northMap = generate_axes_north_pole()
+
+    mapImageFileName = generate_static_map_png_file_name(outputFileName, day=13)
+
+    # Plotting with a variable
+    generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1Day, mapImageFileName)
+
+    print("Saving file: ", mapImageFileName)
+
 def main():
     
     # Load the mesh and data to plot.
@@ -25,17 +38,8 @@ def main():
     # variableToPlot1Day.ravel()
     # print(variableToPlot1Day.shape)
 
-    ###################
-    # ARTIC-ONLY PLOT #
-    ###################
-    fig, northMap = generate_axes_north_pole()
-
-    mapImageFileName = generate_static_map_png_file_name(outputFileName, day=13)
-
-    # Plotting with a variable
-    generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1Day, mapImageFileName)
-
-    print("Saving file: ", mapImageFileName)
+    static_image_no_time_label(latCell, lonCell, variableToPlot1Day)
+    
 
 if __name__ == "__main__":
     main()

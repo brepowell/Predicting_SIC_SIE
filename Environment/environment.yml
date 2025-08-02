@@ -41,6 +41,8 @@
 #   - ipykernel
 #   - cartopy
 #   - papermill
+#   - seaborn
+#   - scikit-learn
 
 # ORIGINAL ENVIRONMENT
 name: sic_sie_env
@@ -54,6 +56,8 @@ dependencies:
   - pandas
   - xarray
   - matplotlib
+  - seaborn           # Added
+  - scikit-learn      # Added
   - pytorch
   - torchvision
   - torchaudio
@@ -61,6 +65,7 @@ dependencies:
   - scipy
   - dask
   - ipykernel
-  - cartopy # Added 
-  - papermill #Added
+  - cartopy           # Added
+  - papermill         # Added
+
 
