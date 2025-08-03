@@ -1,0 +1,110 @@
+INFO:root:Found 2100 NetCDF files:
+INFO:root:Mask size: 53973
+INFO:root:=== Extracting raw data and times in a single loop === 
+INFO:root:Parsed 63875 total dates
+INFO:root:First few: ['1850-01-01T00:30:00' '1850-01-02T00:00:00' '1850-01-03T00:00:00'
+ '1850-01-04T00:00:00' '1850-01-05T00:00:00']
+INFO:root:Total days collected: 63875
+INFO:root:Unique days: 63875
+INFO:root:First 35 days: ['1850-01-01T00:30:00' '1850-01-02T00:00:00' '1850-01-03T00:00:00'
+ '1850-01-04T00:00:00' '1850-01-05T00:00:00' '1850-01-06T00:00:00'
+ '1850-01-07T00:00:00' '1850-01-08T00:00:00' '1850-01-09T00:00:00'
+ '1850-01-10T00:00:00' '1850-01-11T00:00:00' '1850-01-12T00:00:00'
+ '1850-01-13T00:00:00' '1850-01-14T00:00:00' '1850-01-15T00:00:00'
+ '1850-01-16T00:00:00' '1850-01-17T00:00:00' '1850-01-18T00:00:00'
+ '1850-01-19T00:00:00' '1850-01-20T00:00:00' '1850-01-21T00:00:00'
+ '1850-01-22T00:00:00' '1850-01-23T00:00:00' '1850-01-24T00:00:00'
+ '1850-01-25T00:00:00' '1850-01-26T00:00:00' '1850-01-27T00:00:00'
+ '1850-01-28T00:00:00' '1850-01-29T00:00:00' '1850-01-30T00:00:00'
+ '1850-01-31T00:00:00' '1850-02-01T00:00:00' '1850-02-02T00:00:00'
+ '1850-02-03T00:00:00' '1850-02-04T00:00:00']
+INFO:root:Last 35 days: ['2024-11-27T00:00:00' '2024-11-28T00:00:00' '2024-11-29T00:00:00'
+ '2024-11-30T00:00:00' '2024-12-01T00:00:00' '2024-12-02T00:00:00'
+ '2024-12-03T00:00:00' '2024-12-04T00:00:00' '2024-12-05T00:00:00'
+ '2024-12-06T00:00:00' '2024-12-07T00:00:00' '2024-12-08T00:00:00'
+ '2024-12-09T00:00:00' '2024-12-10T00:00:00' '2024-12-11T00:00:00'
+ '2024-12-12T00:00:00' '2024-12-13T00:00:00' '2024-12-14T00:00:00'
+ '2024-12-15T00:00:00' '2024-12-16T00:00:00' '2024-12-17T00:00:00'
+ '2024-12-18T00:00:00' '2024-12-19T00:00:00' '2024-12-20T00:00:00'
+ '2024-12-21T00:00:00' '2024-12-22T00:00:00' '2024-12-23T00:00:00'
+ '2024-12-24T00:00:00' '2024-12-25T00:00:00' '2024-12-26T00:00:00'
+ '2024-12-27T00:00:00' '2024-12-28T00:00:00' '2024-12-29T00:00:00'
+ '2024-12-30T00:00:00' '2024-12-31T00:00:00']
+INFO:root:Shape of combined ice_area array: (63875, 53973)
+INFO:root:Elapsed time for combined data/time loading: 3872.4122397899628 seconds
+INFO:root:=== Calculating Freeboard === 
+INFO:root:Elapsed time for freeboard calculation: 3981.6628561019897 seconds
+INFO:root:=== Patchifying === 
+INFO:root:Elapsed time for patchifying with the latitude_spillover_redo algorithm: 3982.3520152568817 seconds
+INFO:root:=== Normalizing Freeboard with Scikit-learn MinMaxScaler === 
+INFO:root:Using min and max values from the data.
+INFO:root:Freeboard min (pre-norm): 0.0 meters
+INFO:root:Freeboard max (pre-norm): 8.43836784362793 meters
+INFO:root:Freeboard min (post-norm): 0.0
+INFO:root:Freeboard max (post-norm): 1.0
+INFO:root:End of __init__
+INFO:root:Elapsed time for DailyNetCDFDataset __init__: 4003.1666564941406 seconds
+INFO:root:Training set start date: 1850-01-01T00:30:00
+INFO:root:Training set end date: 2011-12-31T00:00:00
+INFO:root:Validation set start date: 2012-01-01T00:00:00
+INFO:root:Validation set end date: 2017-12-31T00:00:00
+INFO:root:Testing set start date: 2018-01-01T00:00:00
+INFO:root:Testing set end date: 2024-12-31T00:00:00
+INFO:root:
+--- Model Architecture ---
+INFO:root:IceForecastTransformer(
+  (patch_embed): Linear(in_features=512, out_features=128, bias=True)
+  (encoder): TransformerEncoder(
+    (layers): ModuleList(
+      (0-3): 4 x TransformerEncoderLayer(
+        (self_attn): MultiheadAttention(
+          (out_proj): NonDynamicallyQuantizableLinear(in_features=128, out_features=128, bias=True)
+        )
+        (linear1): Linear(in_features=128, out_features=512, bias=True)
+        (dropout): Dropout(p=0.1, inplace=False)
+        (linear2): Linear(in_features=512, out_features=128, bias=True)
+        (norm1): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+        (norm2): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+        (dropout1): Dropout(p=0.1, inplace=False)
+        (dropout2): Dropout(p=0.1, inplace=False)
+      )
+    )
+  )
+  (mlp_head): Sequential(
+    (0): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+    (1): Linear(in_features=128, out_features=768, bias=True)
+    (2): Sigmoid()
+  )
+)
+INFO:root:Total model parameters: 958080
+INFO:root:--------------------------
+
+INFO:root:== TIMER IS STARTING FOR TRAINING ==
+INFO:root:===============================
+INFO:root:       STARTING EPOCHS       
+INFO:root:===============================
+INFO:root:Number of epochs: 10
+INFO:root:Learning Rate: 0.0001
+INFO:root:Epoch 1/10 - Train Loss: 0.0493
+INFO:root:Epoch 1/10 - Validation Loss: 0.0240
+INFO:root:Epoch 2/10 - Train Loss: 0.0162
+INFO:root:Epoch 2/10 - Validation Loss: 0.0117
+INFO:root:Epoch 3/10 - Train Loss: 0.0092
+INFO:root:Epoch 3/10 - Validation Loss: 0.0097
+INFO:root:Epoch 4/10 - Train Loss: 0.0073
+INFO:root:Epoch 4/10 - Validation Loss: 0.0084
+INFO:root:Epoch 5/10 - Train Loss: 0.0065
+INFO:root:Epoch 5/10 - Validation Loss: 0.0075
+INFO:root:Epoch 6/10 - Train Loss: 0.0060
+INFO:root:Epoch 6/10 - Validation Loss: 0.0064
+INFO:root:Epoch 7/10 - Train Loss: 0.0056
+INFO:root:Epoch 7/10 - Validation Loss: 0.0073
+INFO:root:Epoch 8/10 - Train Loss: 0.0054
+INFO:root:Epoch 8/10 - Validation Loss: 0.0064
+INFO:root:Epoch 9/10 - Train Loss: 0.0053
+INFO:root:Epoch 9/10 - Validation Loss: 0.0063
+INFO:root:Epoch 10/10 - Train Loss: 0.0052
+INFO:root:Epoch 10/10 - Validation Loss: 0.0070
+INFO:root:===============================================
+INFO:root:Elapsed time for TRAINING: 2925.01 seconds
+INFO:root:===============================================

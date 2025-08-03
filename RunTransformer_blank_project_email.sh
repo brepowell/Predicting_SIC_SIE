@@ -1,15 +1,15 @@
 #!/bin/bash
 #
 # Slurm Batch Script  for Perlmutter (NERSC) - TODO: FILL IN THE MISSING VALUES
+# Run this by saying sbatch Runtransformer.sh
 #
 
 # --- Slurm Directives ---
-#SBATCH --job-name=Transformerfd_nTM_D128_B16_lt40_P210_L256_T7_Fh3_e10_LSD  # Name of job
+#SBATCH --job-name=LSD                          # Name of job (choose a short name so sqs shows it all)
 #SBATCH --account=mXXXXXX                        # NERSC project account (TODO: replace with actual account)
-#SBATCH --queue=regular                          # Specify the queue/qos to use (e.g., debug, regular, shared)
+#SBATCH --qos=regular                          # Specify the queue/qos to use (e.g., debug, regular, shared)
 #SBATCH --nodes=1                                # Runs on a single node with GPU access
 #SBATCH --ntasks-per-node=1                      # Number of tasks (processes) to run per node - single GPU
-#SBATCH --time-min=1:00:00                       # Minimum run time of 1 hour (HH:MM:SS)
 #SBATCH --time=5:00:00                           # Maximum run time of 5 hours (HH:MM:SS)
 #SBATCH --constraint=gpu                         # Specify node type: 'cpu' or 'gpu'
 
@@ -33,7 +33,8 @@ module load conda
 conda activate sic_sie_env
 
 # TODO - TRY THIS: Set environment variables
-# export MY_VAR="some_value"
+# Ran latitude_spillover_redo on 8/2/2025 at 3:00 pm - failed after 1 hour! Time limite exceeded?? I had min time set
+export SLURM_PATCHIFY_TO_USE="lon_spilldown"  # "lon_spilldown": "LSD", "latitude_spillover_redo": "PSO",
 
 # --- Job Execution ---
 

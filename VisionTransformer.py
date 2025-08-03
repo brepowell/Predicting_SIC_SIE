@@ -93,7 +93,8 @@ MAX_FREEBOARD_FOR_NORMALIZATION = 1    # Only works when you set MAX_FREEBOARD_O
 LATITUDE_THRESHOLD = 40          # Determines number of cells and patches (could use -90 to use the entire dataset).
 CELLS_PER_PATCH = 256            # L: Number of cells within each patch
 
-PATCHIFY_TO_USE = "lon_spilldown"   # Change this to use other patching techniques
+#PATCHIFY_TO_USE = "lon_spilldown"   # Change this to use other patching techniques
+PATCHIFY_TO_USE = os.environ.get("SLURM_PATCHIFY_TO_USE", "lon_spilldown")
 
 # --- Run Settings:
 TRIAL_RUN =              False   # SET THIS TO USE THE PRACTICE SET (MUCH FASTER AND SMALLER, for debugging)
@@ -1221,7 +1222,7 @@ class DailyNetCDFDataset(Dataset):
 # In[42]:
 
 
-get_ipython().system('sqs')
+
 
 
 # # DataLoader
@@ -1533,7 +1534,7 @@ class IceForecastTransformer(nn.Module):
 # In[ ]:
 
 
-get_ipython().system('sqs')
+
 
 
 # # Training Loop
@@ -1651,7 +1652,7 @@ if TRAINING:
 # In[ ]:
 
 
-get_ipython().system('sqs')
+
 
 
 # TODO OPTION: Try temporal attention only (ex., Informer, Time Series Transformer).
@@ -2292,5 +2293,5 @@ if MAP_WITH_CARTOPY_ON:
 # In[ ]:
 
 
-get_ipython().system('sqs')
+
 
