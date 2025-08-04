@@ -3,3 +3,4 @@ perlmutterpath.py
 .ipynb_checkpoints/*.png
 __pycache__/
 RunTranformer.sh
+*.err

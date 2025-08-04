@@ -42,19 +42,19 @@ def main():
     # --- Define Patchify Functions Dictionary ---
     PATCHIFY_FUNCTIONS = {
         "latlon_spillover": patchify_by_latlon_spillover,
-        "staggered_polar_descent": patchify_staggered_polar_descent,
+        #"staggered_polar_descent": patchify_staggered_polar_descent,
         "lon_spilldown": patchify_by_lon_spilldown,
         "latitude_spillover_redo": patchify_with_spillover,
-        "latitude_simple": patchify_by_latitude_simple,
-        "latitude_neighbors": patchify_by_latitude,
-        "breadth_first_improved_padded": build_patches_from_seeds_improved_padded,
-        "breadth_first_bfs_basic": build_patches_from_seeds_bfs_basic,
-        "agglomerative": compute_agglomerative_patches,
-        "knn_disjoint": compute_disjoint_knn_patches,
-        "knn_basic": compute_knn_patches,
-        "kmeans": cluster_patches_kmeans,
+        #"latitude_simple": patchify_by_latitude_simple,
+        #"latitude_neighbors": patchify_by_latitude,
+        #"breadth_first_improved_padded": build_patches_from_seeds_improved_padded,
+        #"breadth_first_bfs_basic": build_patches_from_seeds_bfs_basic,
+        #"agglomerative": compute_agglomerative_patches,
+        #"knn_disjoint": compute_disjoint_knn_patches,
+        #"knn_basic": compute_knn_patches,
+        #"kmeans": cluster_patches_kmeans,
         "rows": get_rows_of_patches,
-        "dbscan": get_clusters_dbscan
+        #"dbscan": get_clusters_dbscan
     }
 
     cellsOnCell = np.load(f'cellsOnCell.npy')
@@ -105,24 +105,44 @@ def main():
         params.update(specific_params.get(name, {})) # Add function-specific params
 
         try:
-            labels_full, patch_indices, patch_latlons, algorithm_name = func(**params)
-            print(f"  SUCCESS: {algorithm_name} produced {len(patch_indices)} patches.")
-            print(f"  First patch indices: {patch_indices[0] if patch_indices else 'N/A'}")
-            print(f"  First patch lat/lon: {patch_latlons[0] if patch_latlons.shape[0] > 0 else 'N/A'}")
-            print(f"  Labels full shape: {labels_full.shape}")
 
-            # Multicolored Patches
+            #     Each patchify function returns 3 things:
+            # full_nCells_patch_ids : np.ndarray
+            #     Array of shape (nCells,) giving patch ID or -1 if unassigned.
+            # indices_per_patch_id : List[np.ndarray]
+            #     List of patches, each a list of cell indices (np.ndarray of ints) that correspond with nCells array.
+            # patch_latlon : np.ndarray
+            #     Array of shape (n_patches, 2) containing (latitude, longitude) for one
+            #     representative cell per patch (the first cell added to the patch)
+            full_nCells_patch_ids, cell_indices_per_patch_id, patch_latlon, algorithm_name = func(**params)
+            print(f"  SUCCESS: {algorithm_name} produced {len(cell_indices_per_patch_id)} patches.")
+            print(f"  First patch indices: {cell_indices_per_patch_id[0] if cell_indices_per_patch_id else 'N/A'}")
+            print(f"  First patch lat/lon: {patch_latlon[0] if patch_latlon.shape[0] > 0 else 'N/A'}")
+            print(f"  Labels full shape: {full_nCells_patch_ids.shape}")
+
+            DOT_SIZE = 1
+            HIGHLIGHT_SIZE = DOT_SIZE * 50
+            fig, northMap = generate_axes_north_pole()
+            map_patches_by_index_binned_select_patches(fig, latCell, lonCell, full_nCells_patch_ids, 
+                                                       patch_latlon, northMap,
+                                                       cells_per_patch=cells_per_patch,
+                                                       dot_size=DOT_SIZE, algorithm=algorithm_name,
+                                                       color_map="flag", plot_every_n_patches=10,
+                                                       highlight_cell_index=0, highlight_color='yellow',
+                                                       highlight_size=HIGHLIGHT_SIZE)
+
+            #Multicolored Patches
             # fig, northMap = generate_axes_north_pole()
             # map_patches_by_index_binned(fig,
-            #                             latCell, lonCell, labels_full,   # 1-D numpy arrays
+            #                             latCell, lonCell, full_nCells_patch_ids,   # 1-D numpy arrays
             #                             northMap,
             #                             num_patches, cells_per_patch,
             #                             algorithm = algorithm_name, 
             #                             color_map="flag", 
             #                     )
             
-            # animate_patch_reveal(latCell, lonCell, labels_full, gif_path=f"patch_animation_{algorithm_name}.gif")
-            
+            # animate_patch_reveal(latCell, lonCell, full_nCells_patch_ids, gif_path=f"patch_animation_{algorithm_name}.gif")
+
         except Exception as e:
             print(f"  FAILURE: {name} failed with error: {e}")
             import traceback

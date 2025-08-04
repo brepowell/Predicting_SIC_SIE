@@ -423,14 +423,14 @@ def map_all_lats_lons_binned_by_index(fig, latCell, lonCell, northMap, southMap,
     return tuple(scatters)
 
 
-def map_patches_by_index(fig, latCell, lonCell, patch_indices, hemisphereMap, dot_size=DOT_SIZE):
+def map_patches_by_index(fig, latCell, lonCell, full_nCells_patch_ids, hemisphereMap, dot_size=DOT_SIZE):
     """ Map points with a gradient from white to dark, scaled across all cells. """
 
     # Create global index array based on all cells
     all_indices = np.arange(len(latCell))
 
     # Normalize over the full range
-    norm = mpl.colors.Normalize(vmin=0, vmax=patch_indices.max())
+    norm = mpl.colors.Normalize(vmin=0, vmax=full_nCells_patch_ids.max())
 
     # Create custom colormap
     cmap = LinearSegmentedColormap.from_list("white_to_dark", ["white", "navy"])
@@ -447,7 +447,7 @@ def map_patches_by_index(fig, latCell, lonCell, patch_indices, hemisphereMap, do
     # Plot only the filtered points, but use color values from the full gradient
     sc = hemisphereMap.scatter(lonCell[mask], latCell[mask],
                                s=dot_size,
-                               c=patch_indices[mask],
+                               c=full_nCells_patch_ids[mask],
                                cmap=cmap,
                                norm=norm,
                                transform=ccrs.PlateCarree())
@@ -476,7 +476,7 @@ def map_patches_by_index(fig, latCell, lonCell, patch_indices, hemisphereMap, do
 
 def map_patches_by_index_binned(fig,
                                 latCell, lonCell,            # 1-D numpy arrays
-                                patch_indices,               # 0 … len(latCell)-1
+                                full_nCells_patch_ids,               
                                 hemisphereMap,
                                 n_patches,
                                 cells_per_cluster,
@@ -490,7 +490,7 @@ def map_patches_by_index_binned(fig,
     mask = latCell > LAT_LIMIT          # keep everything else the same
 
     # Recompute patch_id for valid cells only
-    patch_id = patch_indices[mask]
+    patch_id = full_nCells_patch_ids[mask]
     
     # Determine number of unique patches
     num_bins = patch_id.max() + 1
@@ -542,6 +542,89 @@ def map_patches_by_index_binned(fig,
     plt.close(fig)
 
     return sc
+
+
+def map_patches_by_index_binned_select_patches(fig, latCell, lonCell, full_nCells_patch_ids, patch_latlon, hemisphereMap,
+                                               cells_per_patch, dot_size=DOT_SIZE, algorithm="",
+                                               color_map="flag", plot_every_n_patches=5, highlight_cell_index=0,
+                                               highlight_color='yellow',
+                                               highlight_size=DOT_SIZE * 2):
+    """
+    Plot every nth patch, and highlight a specific cell in those patches.
+    This version uses the pre-computed patch_latlon for the highlighted cell.
+    """
+    mask = latCell > LAT_LIMIT
+
+    # Recompute patch_id for valid cells only
+    patch_id = full_nCells_patch_ids[mask]
+
+    # Filter for patches we want to plot (every nth patch)
+    plot_mask = (patch_id % plot_every_n_patches == 0) # Note: Changed highlight_cell_index to 0
+    
+    # Get the data for the patches we are actually plotting
+    latCell_filtered = latCell[mask][plot_mask]
+    lonCell_filtered = lonCell[mask][plot_mask]
+    patch_id_filtered = patch_id[plot_mask]
+
+    # ... (the rest of the plotting setup, including colors and cartopy, remains the same) ...
+    num_bins = full_nCells_patch_ids.max() + 1
+    base_cmap = mpl.cm.get_cmap(color_map)
+    colors = [base_cmap(i / num_bins) for i in range(num_bins)]
+    scatter_colors = [colors[p_id] for p_id in patch_id_filtered]
+
+    fig.subplots_adjust(bottom=0.07, top=0.85, left=0.04, right=0.95, wspace=0.02, hspace=0.12)
+    hemisphereMap.set_extent([MINLONGITUDE, MAXLONGITUDE, LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
+
+    # --------- scatter plot for the filtered patches -----------------
+    sc = hemisphereMap.scatter(lonCell_filtered, latCell_filtered,
+                               s=dot_size,
+                               c=scatter_colors,
+                               transform=ccrs.PlateCarree())
+
+    # --------- highlight the specific cell using the pre-computed latlon -----
+    # Find all unique patch IDs that we are plotting
+    unique_plot_patches = np.unique(patch_id_filtered)
+
+    # Use the pre-computed latlons directly from the patchify function's output
+    # patch_latlon has shape (n_patches, 2)
+    highlight_lats = patch_latlon[unique_plot_patches, 0]
+    highlight_lons = patch_latlon[unique_plot_patches, 1]
+
+    # Plot the highlighted cells on top of the existing scatter plot
+    if len(highlight_lons) > 0:
+        hemisphereMap.scatter(highlight_lons, highlight_lats,
+                              s=highlight_size,
+                              c=highlight_color,
+                              edgecolors='black',
+                              transform=ccrs.PlateCarree(),
+                              zorder=10)
+
+    sm = mpl.cm.ScalarMappable(cmap=base_cmap)
+    sm.set_array(np.arange(num_bins))
+    cbar = fig.colorbar(sm, ax=[hemisphereMap], orientation='horizontal',
+                        fraction=0.05, pad=0.08, shrink=0.8, aspect=30, location='bottom')
+    
+    cbar.set_label(f'Patch ID (Every {plot_every_n_patches}th patch plotted)')
+    
+    unique_plot_patches = np.unique(patch_id_filtered)
+
+    num_ticks_to_show = 10  # You can adjust this number
+    if len(unique_plot_patches) > num_ticks_to_show:
+        tick_indices = np.linspace(0, len(unique_plot_patches) - 1, num_ticks_to_show, dtype=int)
+        cbar_ticks = unique_plot_patches[tick_indices]
+    else:
+        cbar_ticks = unique_plot_patches
+    
+    cbar.set_ticks(cbar_ticks)
+
+    hemisphereMap.set_title(f"Mesh – {len(unique_plot_patches)} patches ({cells_per_patch} cells each)")
+    hemisphereMap.axis('off')
+    plt.suptitle(f"Patchify w/ {algorithm}", size="x-large", fontweight="bold")
+    plt.savefig(f"mesh_patches_binned_{algorithm}_size_{cells_per_patch}_every_{plot_every_n_patches}.png")
+    plt.close(fig)
+
+    return sc
+
 
 def generate_maps_north_and_south(fig, northMap, southMap, latCell, lonCell, variableToPlot1D, mapImageFileName, 
                                   colorBarOn=COLORBARON, grid=GRIDON,

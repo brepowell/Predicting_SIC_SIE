@@ -43,6 +43,7 @@
 #   - papermill
 #   - seaborn
 #   - scikit-learn
+#   - zarr 
 
 # ORIGINAL ENVIRONMENT
 name: sic_sie_env
@@ -67,5 +68,6 @@ dependencies:
   - ipykernel
   - cartopy           # Added
   - papermill         # Added
+  - zarr 
 
 

@@ -52,7 +52,7 @@ INFO:root:Freeboard Q1: 0.0000, Q3: 0.1580, IQR: 0.1580
 INFO:root:Freeboard Lower Bound: -0.2370, Upper Bound: 0.3949
 INFO:root:Total outliers: 209360138 (6.07% of total)
 WARNING:root:Potential outliers detected!
-INFO:root:Freeboard analysis plot saved as /pscratch/sd/b/brelypo/Predicting_SIC_SIE/FB_analysis_prod_fb_pre_norm.png
+INFO:root:Freeboard analysis plot saved
 INFO:root:--- Analyzing Ice Area Imbalance  ---
 INFO:root:Total Ice Area data points: 3447525375
 INFO:root:Percentage of values == 0: 60.41% (2082535065 points)
@@ -84,7 +84,7 @@ INFO:root:Freeboard Q1: 0.0000, Q3: 0.0187, IQR: 0.0187
 INFO:root:Freeboard Lower Bound: -0.0281, Upper Bound: 0.0468
 INFO:root:Total outliers: 209360207 (6.07% of total)
 WARNING:root:Potential outliers detected!
-INFO:root:Freeboard analysis plot saved as /pscratch/sd/b/brelypo/Predicting_SIC_SIE/FB_analysis_prod_fb_post_norm.png
+INFO:root:Freeboard analysis plot saved
 INFO:root:End of __init__
 INFO:root:Elapsed time for DailyNetCDFDataset __init__: 3297.0680944919586 seconds
 INFO:root:Training set start date: 1850-01-01T00:30:00
@@ -152,4 +152,4 @@ INFO:root:===============================================
 INFO:root:Elapsed time for TRAINING: 2959.70 seconds
 INFO:root:===============================================
 INFO:root:--- Plotting SIC Distribution Comparison with Separate Zeros (10 bins) ---
-INFO:root:SIC distribution comparison bar plot with separate zeros saved as /pscratch/sd/b/brelypo/Predicting_SIC_SIE/SIC_Distribution_Comparison_Bars_SeparateZeros_Percentages_1850_2024_10bins.png
+INFO:root:SIC distribution comparison bar plot with separate zeros saved as
