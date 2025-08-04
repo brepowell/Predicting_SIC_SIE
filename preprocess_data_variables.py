@@ -8,14 +8,7 @@ from sklearn.preprocessing import MinMaxScaler
 import zarr
 
 # Import your custom modules
-from perlmutterpath import * # Contains data_dir, mesh_dir, PROCESSED_DATA_DIR, etc.
-from NC_FILE_PROCESSING.metrics_and_plots import compute_freeboard # Assuming this is available
-from VisionTransformer import *
-
-if TRIAL_RUN:
-    model_mode = "tr" # Training Dataset
-else:
-    model_mode = "fd" # Full Dataset
+from perlmutterpath import * # Contains data_dir, mesh_dir, etc.
 
 import logging
 
@@ -28,8 +21,9 @@ D_SNOW = 330    # Density of snow (kg/m^3)
 
 MIN_SIC = 1e-6
 
-def compute_freeboard(sea_ice_concentration: np.ndarray, 
-                      ice_volume: np.ndarray, 
+
+def compute_freeboard(sea_ice_concentration: np.ndarray,
+                      ice_volume: np.ndarray,
                       snow_volume: np.ndarray) -> np.ndarray:
     """
     Compute sea ice freeboard from ice and snow grid cell averaged thickness and sea_ice_concentration.
@@ -68,7 +62,7 @@ def compute_freeboard(sea_ice_concentration: np.ndarray,
         )
     
     return freeboard
-
+    
 def preprocess_and_save_variables_to_zarr(
     data_dir: str,
     mesh_dir: str,
@@ -76,8 +70,10 @@ def preprocess_and_save_variables_to_zarr(
     normalize_on: bool,
     max_freeboard_for_normalization: int,
     max_freeboard_on: bool,
-    trial_run: bool, # Optional - use the data in the trial directory instead of the full dataset
-    output_dir: str = "./"
+    trial_run: bool,
+    output_dir: str = "./",
+    model_mode: str = None,
+    norm: str = None
 ):
     """
     Performs data loading and freeboard calculation, saving the results to Zarr.
@@ -105,132 +101,166 @@ def preprocess_and_save_variables_to_zarr(
         The minimum latitude to use for Arctic data
 
     """
+
     start_time = time.perf_counter()
-    
-    # 1. Gather files
-    file_pattern = os.path.join(data_dir, "v3.LR.historical_0051.mpassi.hist.am.timeSeriesStatsDaily.202*.nc") if trial_run else os.path.join(data_dir, "v3.LR.historical_0051.mpassi.hist.am.timeSeriesStatsDaily.*.nc")
-    file_paths = sorted(glob.glob(file_pattern))
-    if not file_paths:
-        raise FileNotFoundError(f"No *.nc files found matching the pattern in {data_dir}")
-    
-    num_raw_files = len(file_paths)
-    logging.info(f"Found {num_raw_files} NetCDF files.")
-    
-    # 2. Load mesh and create mask
-    mesh = xr.open_dataset(mesh_dir)
-    latCell = np.degrees(mesh["latCell"].values)
-    cell_mask = latCell >= latitude_threshold
-    mesh.close()
-    
-    masked_ncells_size = np.count_nonzero(cell_mask)
-    logging.info(f"Mask size: {masked_ncells_size}")
+    print(f"Starting data preprocessing with model_mode={model_mode}, norm={norm}")
+    logging.info(f"Starting data preprocessing with model_mode={model_mode}, norm={norm}")
 
-    # Create mappings for full to masked indices
-    full_to_masked = {full_idx: new_idx for new_idx, full_idx in enumerate(np.where(cell_mask)[0])}
-    masked_to_full = {v: k for k, v in full_to_masked.items()}
+    # Define paths for the Zarr stores
+    zarr_path_unnormalized = os.path.join(output_dir, f"{model_mode}_{norm}_preprocessed_data.zarr")
+    zarr_path_normalized = os.path.join(output_dir, f"{model_mode}_{norm}_normalized_data.zarr")
 
-    # 3. Load raw data with xarray.open_mfdataset
-    # Specify 'timeDaily_avg_iceAreaCell', 'timeDaily_avg_iceVolumeCell', 'timeDaily_avg_snowVolumeCell'
-    # as the variables to load.
-    # Use combine='nested' and concat_dim='Time' because the NetCDF files do not have explicit time coordinates,
-    # but the 'Time' dimension exists and files are sorted by name.
-    # parallel=True enables Dask for parallel file opening and processing.   
-    with xr.open_mfdataset(
-        file_pattern,
-        combine='nested',
-        concat_dim='Time',
-        parallel=True,
-        data_vars=['timeDaily_avg_iceAreaCell', 'timeDaily_avg_iceVolumeCell', 'timeDaily_avg_snowVolumeCell', 'xtime_startDaily'],
-        decode_times=True
-    ) as combined_ds:
+    # This is the new, conditional logic block
+    if os.path.exists(zarr_path_unnormalized):
+        logging.info(f"Found existing un-normalized data at '{zarr_path_unnormalized}'. Loading...")
+        ds_unnormalized = xr.open_zarr(zarr_path_unnormalized)
+        logging.info("Existing data loaded successfully.")
+    else:
+        logging.info("No existing un-normalized data found. Starting from scratch.")
+        # 1. Gather files (your existing logic)
+        file_pattern = os.path.join(data_dir, "v3.LR.historical_0051.mpassi.hist.am.timeSeriesStatsDaily.202*.nc") if trial_run else os.path.join(data_dir, "v3.LR.historical_0051.mpassi.hist.am.timeSeriesStatsDaily.*.nc")
+        file_paths = sorted(glob.glob(file_pattern))
+        if not file_paths:
+            raise FileNotFoundError(f"No *.nc files found matching the pattern in {data_dir}")
+
+        num_raw_files = len(file_paths)
+        logging.info(f"Found {num_raw_files} NetCDF files.")
+
+        # 2. Load mesh and create mask (your existing logic)
+        mesh = xr.open_dataset(mesh_dir)
+        latCell = np.degrees(mesh["latCell"].values)
+        cell_mask = latCell >= latitude_threshold
+        mesh.close()
+        masked_ncells_size = np.count_nonzero(cell_mask)
+        logging.info(f"Mask size: {masked_ncells_size}")
+
+        full_to_masked = {full_idx: new_idx for new_idx, full_idx in enumerate(np.where(cell_mask)[0])}
+        masked_to_full = {v: k for k, v in full_to_masked.items()}
         
-        xtime_byte_array = combined_ds["xtime_startDaily"].values
-        xtime_unicode_array = xtime_byte_array.astype(str)
-        xtime_cleaned_array = np.char.replace(xtime_unicode_array, "_", " ")
-        times = np.asarray(xtime_cleaned_array, dtype='datetime64[s]')
+        # 3. Load raw data with xarray.open_mfdataset
+        logging.info("Loading raw data with xarray.open_mfdataset...")
+        with xr.open_mfdataset(
+            file_pattern,
+            combine='nested',
+            concat_dim='Time',
+            parallel=False,
+            data_vars=['timeDaily_avg_iceAreaCell', 'timeDaily_avg_iceVolumeCell', 'timeDaily_avg_snowVolumeCell', 'xtime_startDaily'],
+            decode_times=True,
+            engine='netcdf4',
+            chunks={'Time': 30}
+        ) as combined_ds:
+            xtime_byte_array = combined_ds["xtime_startDaily"].values
+            xtime_unicode_array = xtime_byte_array.astype(str)
+            xtime_cleaned_array = np.char.replace(xtime_unicode_array, "_", " ")
+            times = np.asarray(xtime_cleaned_array, dtype='datetime64[s]')
+            
+            # Use .compute() here to load into memory after masking
+            ice_area = combined_ds["timeDaily_avg_iceAreaCell"][:, cell_mask].compute().values
+            ice_volume_combined = combined_ds["timeDaily_avg_iceVolumeCell"][:, cell_mask].compute().values
+            snow_volume_combined = combined_ds["timeDaily_avg_snowVolumeCell"][:, cell_mask].compute().values
+
+        logging.info(f"Elapsed time for raw data loading and masking: {time.perf_counter() - start_time:.2f} seconds.")
+
+        # 4. Derive Freeboard
+        logging.info("Calculating Freeboard...")
+        freeboard_raw = compute_freeboard(ice_area, ice_volume_combined, snow_volume_combined)
+        logging.info("Freeboard calculation completed.")
         
-        ice_area = combined_ds["timeDaily_avg_iceAreaCell"][:, cell_mask].compute().values
-        ice_volume_combined = combined_ds["timeDaily_avg_iceVolumeCell"][:, cell_mask].compute().values
-        snow_volume_combined = combined_ds["timeDaily_avg_snowVolumeCell"][:, cell_mask].compute().values
+        # Create the un-normalized dataset
+        ds_unnormalized = xr.Dataset(
+            {
+                "ice_area": (("time", "nCells_masked"), ice_area),
+                "freeboard": (("time", "nCells_masked"), freeboard_raw),
+                "cell_mask": ("nCells_full", cell_mask),
+                "full_to_masked": ((), str(full_to_masked)),
+                "masked_to_full": ((), str(masked_to_full)),
+                "times": ("time", times),
+                "num_raw_files": ((), num_raw_files),
+            },
+            coords={
+                "time": times,
+                "nCells_masked": np.arange(ice_area.shape[1]),
+                "nCells_full": np.arange(len(latCell)),
+            }
+        )
 
-    logging.info(f"Elapsed time for raw data loading: {time.perf_counter() - start_time:.2f} seconds.")
+        # 5. Save the un-normalized data to a Zarr store
+        os.makedirs(output_dir, exist_ok=True)
+        logging.info(f"Saving un-normalized data as '{zarr_path_unnormalized}'...")
+        ds_unnormalized.to_zarr(zarr_path_unnormalized, mode='w', compute=True)
+        logging.info("Un-normalized data saved.")
 
-    # 4. Derive Freeboard
-    logging.info("Calculating Freeboard...")
-    freeboard_raw = compute_freeboard(ice_area, ice_volume_combined, snow_volume_combined)
-    logging.info("Freeboard calculation completed.")
+    # Now, whether the data was loaded or newly created, ds_unnormalized is available.
     
-    # Create the output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # 5. Save the un-normalized data to a Zarr store
-    zarr_path_unnormalized = os.path.join(output_dir, "{model_mode}_preprocessed_data_unnormalized.zarr")
-    logging.info(f"Saving un-normalized data as {model_mode}_preprocessed_data_unnormalized.zarr")
-    
-    ds_unnormalized = xr.Dataset(
-        {
-            "ice_area": (("time", "nCells_masked"), ice_area),
-            "freeboard": (("time", "nCells_masked"), freeboard_raw),
-            "cell_mask": ("nCells_full", cell_mask),
-            "full_to_masked": ((), str(full_to_masked)),
-            "masked_to_full": ((), str(masked_to_full)),
-            "times": ("time", times),
-            "num_raw_files": ((), num_raw_files),
-        },
-        coords={
-            "time": times,
-            "nCells_masked": np.arange(ice_area.shape[1]),
-            "nCells_full": np.arange(len(latCell)),
-        }
-    )
-    ds_unnormalized.to_zarr(zarr_path_unnormalized, mode='w', compute=True)
-    logging.info("Un-normalized data saved.")
-
-    # 6. Normalize and save the second version
-    # Normalize the Freeboard (Area is already between 0 and 1; Freeboard is not)
+    # 6. Optional: Normalize and save
     if normalize_on:
-        logging.info(f"=== Normalizing Freeboard with Scikit-learn MinMaxScaler === ")
-        freeboard_normalized = freeboard_raw.copy()
-        freeboard_reshaped = freeboard_normalized.reshape(-1, 1)
-
-        if max_freeboard_on:
-            min_val = 0
-            max_val = max_freeboard_for_normalization
+        # Check if normalized data already exists
+        if os.path.exists(zarr_path_normalized):
+            logging.info(f"Normalized data already exists at '{zarr_path_normalized}'. Skipping normalization.")
         else:
-            min_val = freeboard_reshaped.min()
-            max_val = freeboard_reshaped.max()
-        
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        scaler.fit([[min_val], [max_val]])
+            logging.info(f"=== Normalizing Freeboard with Scikit-learn MinMaxScaler === ")
+            # Use a fresh copy of the unnormalized data to prevent modifying the original
+            freeboard_raw = ds_unnormalized['freeboard'].values 
+            freeboard_normalized = freeboard_raw.copy()
+            freeboard_reshaped = freeboard_normalized.reshape(-1, 1)
 
-         # Transform the freeboard data and reshape it back to the original shape
-        freeboard_normalized = scaler.transform(freeboard_reshaped).reshape(freeboard_raw.shape)
-        freeboard_normalized = np.clip(freeboard_normalized, 0, 1)
+            if max_freeboard_on:
+                min_val = 0
+                max_val = max_freeboard_for_normalization
+            else:
+                min_val = freeboard_reshaped.min()
+                max_val = freeboard_reshaped.max()
+            
+            scaler = MinMaxScaler(feature_range=(0, 1))
+            scaler.fit([[min_val], [max_val]])
 
-        zarr_path_normalized = os.path.join(output_dir, "{model_mode}_preprocessed_data_normalized.zarr")
-        logging.info(f"Saving normalized data as {model_mode}_preprocessed_data_normalized.zarr")
-        
-        ds_normalized = ds_unnormalized.copy(deep=True) # Start with a copy
-        ds_normalized['freeboard'] = (("time", "nCells_masked"), freeboard_normalized)
-        
-        ds_normalized.to_zarr(zarr_path_normalized, mode='w', compute=True)
-        logging.info("Normalized data saved.")
-    
+            freeboard_normalized = scaler.transform(freeboard_reshaped).reshape(freeboard_raw.shape)
+            freeboard_normalized = np.clip(freeboard_normalized, 0, 1)
+
+            ds_normalized = ds_unnormalized.copy(deep=True)
+            ds_normalized['freeboard'] = (("time", "nCells_masked"), freeboard_normalized)
+            
+            logging.info(f"Saving normalized data as '{zarr_path_normalized}'...")
+            ds_normalized.to_zarr(zarr_path_normalized, mode='w', compute=True)
+            logging.info("Normalized data saved.")
+    else:
+        logging.info("Normalization is turned off. No normalized data will be created.")
+
     end_time = time.perf_counter()
     logging.info(f"Total preprocessing time: {(end_time - start_time):.2f} seconds.")
 
 if __name__ == "__main__":
 
+    LATITUDE_THRESHOLD = 40
+    TRIAL_RUN = False
+    NORMALIZE_ON = True
+    MAX_FREEBOARD_ON = False
+    MAX_FREEBOARD_FOR_NORMALIZATION = 1
+
+    if TRIAL_RUN:
+        model_mode = "tr" # Training Dataset
+    else:
+        model_mode = "fd" # Full Dataset
+    
+    if NORMALIZE_ON:
+        if MAX_FREEBOARD_ON:
+            norm = f"nT{MAX_FREEBOARD_FOR_NORMALIZATION}" # Using the specified max value
+        else:
+            norm = "nTM" # Using the absolute max
+    else:
+        norm = "nF" # Normalization is off
+
     # Define and pass your parameters
     preprocess_and_save_variables_to_zarr(
         data_dir=data_dir,
         mesh_dir=mesh_dir,
-        output_dir=PROCESSED_DATA_DIR,
         latitude_threshold=LATITUDE_THRESHOLD,
         normalize_on=NORMALIZE_ON,
         max_freeboard_for_normalization=MAX_FREEBOARD_FOR_NORMALIZATION,
         max_freeboard_on=MAX_FREEBOARD_ON,
-        trial_run=TRIAL_RUN
+        trial_run=TRIAL_RUN,
+        model_mode=model_mode,
+        norm=norm,
     )
 
 
