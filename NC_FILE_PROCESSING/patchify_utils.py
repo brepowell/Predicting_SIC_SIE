@@ -276,6 +276,9 @@ def patchify_by_lon_spilldown(latCell, lonCell, cells_per_patch=256, num_patches
     # The 'mask' here ensures the bar graph considers only the cells that were eligible.
     bar_graph_cluster_distribution(labels_full, mask, algorithm)
 
+    print("LAST PATCH SIZE: ", len(patch_indices[-1]))
+    print("Contains a -1 index ", -1 in patch_indices[-1])
+
     # Return the full labels array, the list of patch index arrays, and the representative lat/lons
     return labels_full, patch_indices, np.array(patch_latlons), algorithm 
     
@@ -367,6 +370,9 @@ def patchify_by_latlon_spillover(latCell, lonCell, cells_per_patch=256, num_patc
     labels_full_final = np.full(len(latCell), -1)
     for i, inds in enumerate(patch_indices):
         labels_full_final[inds] = i
+
+    print("LAST PATCH SIZE: ", len(patch_indices[-1]))
+    print("Contains a -1 index ", -1 in patch_indices[-1])
     
     bar_graph_cluster_distribution(labels_full_final, mask, algorithm)
     
@@ -420,14 +426,8 @@ def patchify_with_spillover(latCell, lonCell, cells_per_patch=256, num_patches=N
     # avg latitude of each patch
     avg_lats = np.array([latCell[patch].mean() for patch in patch_indices])
     
-    # Scatter plot of patch_id vs avg_latitude
-    plt.scatter(range(len(avg_lats)), avg_lats)
-    plt.xlabel("Patch ID")
-    plt.ylabel("Average Latitude")
-    plt.title("Are Patch IDs ordered by latitude?")
-    plt.savefig("patch_ids_by_avg_lat.png")
-    plt.close()
-    print("saved_fig")
+    print("LAST PATCH SIZE: ", len(patch_indices[-1]))
+    print("Contains a -1 index ", -1 in patch_indices[-1])
 
     patch_latlons = np.array([(latCell[patch[0]], lonCell[patch[0]]) for patch in patch_indices])
     
@@ -473,6 +473,8 @@ def patchify_by_latitude_simple(latCell, lonCell, cells_per_patch=256, num_patch
     labels_full = np.full(len(latCell), -1)
     for i, inds in enumerate(patch_indices):
         labels_full[inds] = i
+
+    print("LAST PATCH SIZE: ", len(patch_indices[-1]))
     
     bar_graph_cluster_distribution(labels_full, mask, algorithm)
 
@@ -535,6 +537,8 @@ def patchify_by_latitude(latCell, lonCell, cells_per_patch=256, num_patches=210,
     labels_full = np.full(len(latCell), -1)
     for i, inds in enumerate(patch_indices):
         labels_full[inds] = i
+
+    print("LAST PATCH SIZE: ", len(patch_indices[-1]))
 
     bar_graph_cluster_distribution(labels_full, mask, algorithm)
     
@@ -902,6 +906,9 @@ def get_rows_of_patches(latCell, lonCell, cells_per_patch=256, num_patches=210, 
         patch_indices = []
     else:
         patch_indices = [np.where(labels_full == i)[0] for i in range(max_bucket_id + 1)]
+
+    print("LAST PATCH SIZE: ", len(patch_indices[-1]))
+    print("Contains a -1 index ", -1 in patch_indices[-1])
     
     # Check if patch_indices is empty before attempting to access patch[0]
     if patch_indices: # If the list of patches is not empty
@@ -909,6 +916,8 @@ def get_rows_of_patches(latCell, lonCell, cells_per_patch=256, num_patches=210, 
     else:
         patch_latlons = np.empty((0, 2)) # Return an empty array of shape (0,2) if no patches
 
+
+    
     return labels_full, patch_indices, patch_latlons, algorithm
     
 def get_clusters_dbscan(latCell, lonCell, cells_per_patch=256, num_patches=210, latitude_threshold=40, seed=42):
