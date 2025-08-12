@@ -10,6 +10,7 @@
 #SBATCH --qos=regular                          # Specify the queue/qos to use (e.g., debug, regular, shared)
 #SBATCH --nodes=1                                # Runs on a single node with GPU access
 #SBATCH --ntasks-per-node=1                      # Number of tasks (processes) to run per node - single GPU
+#SBATCH --gpus-per-node=4
 #SBATCH --time=5:00:00                           # Maximum run time of 5 hours (HH:MM:SS)
 #SBATCH --constraint=gpu                         # Specify node type: 'cpu' or 'gpu'
 
