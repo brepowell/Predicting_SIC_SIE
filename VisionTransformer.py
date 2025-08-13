@@ -25,11 +25,20 @@ print('Numpy version', np.__version__)
 # In[4]:
 
 
+import torch
+from torch.utils.data import Dataset, DataLoader
+
+print('PyTorch version', torch.__version__)
+
+
+# In[5]:
+
+
 from perlmutterpath import *  # Contains the data_dir and mesh_dir variables
 NUM_FEATURES = 2              # C: Number of features per cell (ex., Freeboard, Ice Area)
 
 
-# In[5]:
+# In[6]:
 
 
 from NC_FILE_PROCESSING.patchify_utils import *
@@ -76,7 +85,7 @@ PATCHIFY_ABBREVIATIONS = {
 # 
 # Note that if you use the login node for training for the Jupyter notebook version (even for the trial dataset that is much smaller), you run the risk of getting the error: # OutOfMemoryError: CUDA out of memory.
 
-# In[6]:
+# In[7]:
 
 
 # --- Run Settings:
@@ -84,30 +93,30 @@ PATCHIFY_ABBREVIATIONS = {
 
 TRIAL_RUN =                    False   # SET THIS TO USE THE PRACTICE SET (MUCH FASTER AND SMALLER, for debugging)
 NORMALIZE_ON =                 True    # SET THIS TO USE NORMALIZATION ON FREEBOARD (Results are independent of patchify used)
-TRAINING =                     True    # SET THIS TO RUN THE TRAINING LOOP (Use on full dataset for results)
+TRAINING =                     False    # SET THIS TO RUN THE TRAINING LOOP (Use on full dataset for results)
 EVALUATING_ON =                False    # SET THIS TO RUN THE METRICS AT THE BOTTOM (Use on full dataset for results)
 PLOT_DAY_BY_DAY_METRICS =      False    # See a comparison of metrics per forecast day
 
 # Only run ONCE for daily and once for monthly!!
 # Run Settings (already performed, not needed now - KEEP FALSE!!!)
-PLOT_DATA_SPLIT_DISTRIBUTION = False   # Run the data split function to see the train, val, test distribution
+PLOT_DATA_SPLIT_DISTRIBUTION = True   # Run the data split function to see the train, val, test distribution
 MAX_FREEBOARD_ON =            False   # To normalize with a pre-defined maximum for outlier handling
 MAP_WITH_CARTOPY_ON =         False   # Make sure the Cartopy library is included in the kernel
 
 # --- Time-Related Variables:
 CONTEXT_LENGTH = 7            # T: Number of historical time steps used for input
-FORECAST_HORIZON = 3          # Number of future time steps to predict (ex. 1 day for next time step)
+#FORECAST_HORIZON = 7          # Number of future time steps to predict (ex. 1 day for next time step)
 
 # --- Model Hyperparameters:
 D_MODEL = 128                 # d_model: Dimension of the transformer's internal representations (embedding dimension)
 N_HEAD = 8                    # nhead: Number of attention heads
 NUM_TRANSFORMER_LAYERS = 4    # num_layers: Number of TransformerEncoderLayers
-BATCH_SIZE = 16               # 16 for context/forecast of 7 and 3; lower for longer range
+BATCH_SIZE = 16               # 16 for context/forecast of 7 and 3; lower for longer range; kernel may die with larger sizes
 NUM_EPOCHS = 10
 
 # --- Performance-Related Variables:
-NUM_WORKERS = 64   # 64 worked fast for the 7 day forecast
-PREFETCH_FACTOR = 4 # 4 worked fast for the 7 day forecast
+NUM_WORKERS = 64   # 64 worked fast for the 7 day forecast; too many workers causes it to stall out
+PREFETCH_FACTOR = 4 # 4 worked fast for the 7 day forecast (tried 16 for 4 GPUs, but ran out of shared memory; 8 works ok)
 
 # --- Feature-Related Variables:
 MAX_FREEBOARD_FOR_NORMALIZATION = 1    # Only works when you set MAX_FREEBOARD_ON too; bad results
@@ -123,7 +132,7 @@ FORECAST_HORIZON = os.environ.get("SLURM_FORECAST_HORIZON", 7) # for SLURM
 
 # ## Other Variables Dependent on Those Above ^
 
-# In[7]:
+# In[8]:
 
 
 mesh = xr.open_dataset(mesh_dir)
@@ -179,13 +188,13 @@ SPECIFIC_PARAMS = {
 }
 
 
-# In[8]:
+# In[9]:
 
 
 if TRIAL_RUN:
     model_mode = "tr" # Training Dataset
 else:
-    model_mode = "fd" # Full Dataset
+    model_mode = "fd" # Full Dataset DAILY - TODO: MAKE MONTHLY OPTION
 
 if NORMALIZE_ON:
     if MAX_FREEBOARD_ON:
@@ -200,7 +209,16 @@ patching_strategy_abbr = PATCHIFY_ABBREVIATIONS.get(PATCHIFY_TO_USE, "UNKNWN")
 
 if patching_strategy_abbr == "UNKNWN":
     raise ValueError("Check the name of the patchify function")
-                   
+
+if TRAINING and not torch.cuda.is_available():
+    raise ValueError("There is a problem with Torch not recognizing the GPUs")
+else:
+    
+    BATCH_SIZE = BATCH_SIZE * torch.cuda.device_count()
+    # import psutil
+    # NUM_WORKERS = psutil.cpu_count() - 2 # not working!
+    # print(f"num_workers is {NUM_WORKERS}")
+
 # Model nome convention - fd:full data, etc.
 model_version = (
     f"{model_mode}_{norm}_D{D_MODEL}_B{BATCH_SIZE}_lt{LATITUDE_THRESHOLD}_P{NUM_PATCHES}_L{CELLS_PER_PATCH}"
@@ -229,49 +247,40 @@ print(f"Dataset Name: {PROCESSED_DATA_DIR}")
 
 # # More Imports
 
-# In[9]:
+# In[10]:
 
 
 import sys
 print('System Version:', sys.version)
 
 
-# In[10]:
+# In[11]:
 
 
 #print(sys.executable) # for troubleshooting kernel issues
 #print(sys.path)
 
 
-# In[11]:
+# In[12]:
 
 
 import os
 #print(os.getcwd())
 
 
-# In[12]:
+# In[13]:
 
 
 import pandas as pd
 print('Pandas version', pd.__version__)
 
 
-# In[13]:
+# In[14]:
 
 
 import matplotlib
 import matplotlib.pyplot as plt
 print('Matplotlib version', matplotlib.__version__)
-
-
-# In[14]:
-
-
-import torch
-from torch.utils.data import Dataset, DataLoader
-
-print('PyTorch version', torch.__version__)
 
 
 # In[15]:
@@ -289,7 +298,7 @@ print('Seaborn version', sns.__version__)
 if TRAINING and not torch.cuda.is_available():
     raise ValueError("There is a problem with Torch not recognizing the GPUs")
 else:
-    print(torch.cuda.device_count()) # check the number of available CUDA devices
+    print(f"Number of GPUs: {torch.cuda.device_count()}") # check the number of available CUDA devices
     # will print 1 on login node; 4 on GPU exclusive node; 1 on shared GPU node
 
 
@@ -780,10 +789,10 @@ else:
 
     # Define the start and end years for each set - keep this for the full dataset
     train_start_year = 1850
-    train_end_year = 2011   
-    val_start_year = 2012
-    val_end_year = 2017
-    test_start_year = 2018
+    train_end_year = 2012   
+    val_start_year = 2013
+    val_end_year = 2018
+    test_start_year = 2019
     test_end_year = 2024
 
     # Now use these times for year-based splitting
@@ -912,8 +921,9 @@ print(f"actual target_tensor.shape = {target_tensor.shape}")
 
 
 # ## Checking the distribution of train, validation, and testing sets
+# This takes a long time. Only do this once for the data.
 
-# In[ ]:
+# In[22]:
 
 
 # --- Conditional Data collection for Training and Validation Sets ---
@@ -927,21 +937,24 @@ if PLOT_DATA_SPLIT_DISTRIBUTION:
     all_test_actual_values = []
 
     # Iterate directly over the subsets
-    for i in range(len(train_set)):
-        _, sample_y, *_ = train_set[i]
-        all_train_actual_values.append(sample_y.cpu().numpy().flatten())
-    final_train_values = np.concatenate(all_train_actual_values)
-    
-    for i in range(len(val_set)):
-        _, sample_y, *_ = val_set[i]
-        all_val_actual_values.append(sample_y.cpu().numpy().flatten())
-    final_val_values = np.concatenate(all_val_actual_values)
-
     for i in range(len(test_set)):
         _, sample_y, *_ = test_set[i]
         all_test_actual_values.append(sample_y.cpu().numpy().flatten())
     final_test_values = np.concatenate(all_test_actual_values)
+    print("Finished iterating over test_set")
 
+    for i in range(len(val_set)):
+        _, sample_y, *_ = val_set[i]
+        all_val_actual_values.append(sample_y.cpu().numpy().flatten())
+    final_val_values = np.concatenate(all_val_actual_values)
+    print("Finished iterating over val_set")
+    
+    for i in range(len(train_set)):
+        _, sample_y, *_ = train_set[i]
+        all_train_actual_values.append(sample_y.cpu().numpy().flatten())
+    final_train_values = np.concatenate(all_train_actual_values)
+    print("Finished iterating over train_set")
+    
     print("--- Finished collecting ground truth data from subsets ---")
     print(f"Elapsed time for collecting ground truth method: {time.perf_counter() - start_time_collect_data_new:.2f} seconds")
 
@@ -984,14 +997,12 @@ if PLOT_DATA_SPLIT_DISTRIBUTION:
 
 # # Transformer Class
 
-# In[ ]:
+# In[23]:
 
 
 import torch
 import torch.nn as nn
 import time
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class IceForecastTransformer(nn.Module):
     
@@ -1161,8 +1172,16 @@ if TRAINING:
     
     # Set level to logging.INFO to see the statements
     logging.basicConfig(filename='IceForecastTransformerInstance.log', filemode='w', level=logging.INFO)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = IceForecastTransformer()
     
-    model = IceForecastTransformer().to(device)
+    # Wrap the model with DataParallel if there's more than one GPU available
+    if torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
+        
+    model.to(device)
     
     print("\n--- Model Architecture ---")
     print(model)
