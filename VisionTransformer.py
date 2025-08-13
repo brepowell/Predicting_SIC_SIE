@@ -88,17 +88,15 @@ TRAINING =                     True    # SET THIS TO RUN THE TRAINING LOOP (Use 
 EVALUATING_ON =                False    # SET THIS TO RUN THE METRICS AT THE BOTTOM (Use on full dataset for results)
 PLOT_DAY_BY_DAY_METRICS =      False    # See a comparison of metrics per forecast day
 
-# Only run ONCE!!
-PLOT_DATA_SPLIT_DISTRIBUTION = False    # Run the data split function to see the train, val, test distribution
-
+# Only run ONCE for daily and once for monthly!!
 # Run Settings (already performed, not needed now - KEEP FALSE!!!)
-PLOT_DATA_FULL_DISTRIBUTION = False   # SET THIS TO PLOT THE OUTLIERS (Run ONCE with full set. Results are independent of variables set here)
+PLOT_DATA_SPLIT_DISTRIBUTION = False   # Run the data split function to see the train, val, test distribution
 MAX_FREEBOARD_ON =            False   # To normalize with a pre-defined maximum for outlier handling
 MAP_WITH_CARTOPY_ON =         False   # Make sure the Cartopy library is included in the kernel
 
 # --- Time-Related Variables:
 CONTEXT_LENGTH = 7            # T: Number of historical time steps used for input
-#FORECAST_HORIZON = 3          # Number of future time steps to predict (ex. 1 day for next time step)
+FORECAST_HORIZON = 3          # Number of future time steps to predict (ex. 1 day for next time step)
 
 # --- Model Hyperparameters:
 D_MODEL = 128                 # d_model: Dimension of the transformer's internal representations (embedding dimension)
@@ -402,7 +400,7 @@ class DailyNetCDFDataset(Dataset):
         # File parameters
         processed_data_path: str = "./",
 
-        # For len function
+        # For __len__ function
         context_length: int = CONTEXT_LENGTH,
         forecast_horizon: int = FORECAST_HORIZON,
 
@@ -444,9 +442,6 @@ class DailyNetCDFDataset(Dataset):
             raise FileNotFoundError(f"Pre-processed Zarr file not found at {full_zarr_path}. Please run `preprocess_data_variables.py` first.")
 
         try:
-            # Check on what's in the zarr
-            #z = zarr.open(full_zarr_path, mode='r')
-            #print(z.tree())
             '''
             Dimensions:         (nCells_full: 465044, time: 63875, nCells_masked: 53973)
             Coordinates:
@@ -554,9 +549,10 @@ class DailyNetCDFDataset(Dataset):
         Returns the total number of possible starting indices (idx) for a valid sequence.
         A valid sequence needs `self.context_length` days for input and `self.forecast_horizon` days for target.
         
-        ex) If the total number of days is 365, the context_length is 7 and the forecast_horizon is 3, then
+        ex) For daily data, if the total number of days is 365, 
+        the context_length is 7 and the forecast_horizon is 3, then
         
-        365 - (7 + 3) + 1 = 365 - 10 + 1 = 356 valid starting indices
+        365 - (7 + 3) + 1 = 365 - 10 + 1 = 356 is the final valid starting index
         return len(self.freeboard) - (self.context_length + self.forecast_horizon)
         """
         required_length = self.context_length + self.forecast_horizon
@@ -590,9 +586,9 @@ class DailyNetCDFDataset(Dataset):
             specified day.
             Shape: (context_length, num_patches, num_features, patch_size)
             Where:
-            - num_patches: Total number of patches (ex., 140).
+            - num_patches: Total number of patches (ex., 210).
             - num_features: The number of features per cell (currently 2: freeboard, ice_area).
-            - patch_size: The number of cells within each patch.
+            - patch_size: The number of cells within each patch (ex., 256)
             
         """
 
@@ -667,8 +663,8 @@ class DailyNetCDFDataset(Dataset):
             f"\n{len(self.ice_area)} ice_area length"
             f"\n{len(self.freeboard)} freeboard length"
             f"\nPatchify Algorithm: {self.algorithm}" # What patchify algorithm was used
-            f"\n{self.ice_area[-1].shape} shape of ice_area # Should be (63875, 53973) for latitude_threshold of 40"
-            f"\n{self.freeboard[-1].shape} shape of freeboard # Should be (63875, 53973) for latitude_threshold of 40"
+            f"\n{self.ice_area.shape} shape of ice_area # Should be (63875, 53973) for latitude_threshold of 40"
+            f"\n{self.freeboard.shape} shape of freeboard # Should be (63875, 53973) for latitude_threshold of 40"
             f"\n{len(self.indices_per_patch_id)} indices_per_patch_id # Should be {len(self.freeboard[0]) // CELLS_PER_PATCH}"
             f">" 
 
@@ -915,9 +911,80 @@ print("target_tensor should be of shape (forecast_horizon, num_patches, patch_si
 print(f"actual target_tensor.shape = {target_tensor.shape}")
 
 
+# ## Checking the distribution of train, validation, and testing sets
+
+# In[ ]:
+
+
+# --- Conditional Data collection for Training and Validation Sets ---
+from NC_FILE_PROCESSING.metrics_and_plots import *
+
+if PLOT_DATA_SPLIT_DISTRIBUTION:
+    print("\n--- Collecting ground truth data directly from subsets ---")
+    start_time_collect_data_new = time.perf_counter()
+    all_train_actual_values = []
+    all_val_actual_values = []
+    all_test_actual_values = []
+
+    # Iterate directly over the subsets
+    for i in range(len(train_set)):
+        _, sample_y, *_ = train_set[i]
+        all_train_actual_values.append(sample_y.cpu().numpy().flatten())
+    final_train_values = np.concatenate(all_train_actual_values)
+    
+    for i in range(len(val_set)):
+        _, sample_y, *_ = val_set[i]
+        all_val_actual_values.append(sample_y.cpu().numpy().flatten())
+    final_val_values = np.concatenate(all_val_actual_values)
+
+    for i in range(len(test_set)):
+        _, sample_y, *_ = test_set[i]
+        all_test_actual_values.append(sample_y.cpu().numpy().flatten())
+    final_test_values = np.concatenate(all_test_actual_values)
+
+    print("--- Finished collecting ground truth data from subsets ---")
+    print(f"Elapsed time for collecting ground truth method: {time.perf_counter() - start_time_collect_data_new:.2f} seconds")
+
+else:
+    final_train_values = np.array([])
+    final_val_values = np.array([])
+    final_test_values = np.array([])
+
+# 9. Conditional Plotting All Three SIC Distributions (Train, Val, Test Sets)
+if PLOT_DATA_SPLIT_DISTRIBUTION:
+    print("\n--- Plotting data distributions (Train, Val, Test) ---")
+    start_time_plot_data_dist = time.perf_counter()
+    plot_sic_distribution_bars(
+        train_data=final_train_values,
+        val_data=final_val_values,
+        test_data=final_test_values,
+        start_date=train_set_start_year,
+        end_date=test_set_end_year,
+        num_bins=10
+    )
+    print(f"Elapsed time for plotting data distribution comparison: {time.perf_counter() - start_time_plot_data_dist:.2f} seconds")
+
+    # Calculate Pairwise Jensen-Shannon Distances for Data Splits
+    print("\n--- Pairwise Jensen-Shannon Distances for Data Splits ---")
+    start_time_jsd_pairwise = time.perf_counter()
+    distributions_for_jsd = {
+        'train': final_train_values,
+        'validation': final_val_values,
+        'test': final_test_values
+    }
+    
+    jsd_bins = np.linspace(0, 1, 10 + 1)
+    pairwise_jsd_results = jensen_shannon_distance_pairwise(distributions_for_jsd, jsd_bins)
+    
+    for pair, jsd_val in pairwise_jsd_results.items():
+        print(f"JSD ({pair}): {jsd_val:.4f}")
+    end_time_jsd_pairwise = time.perf_counter()
+    print(f"Elapsed time for Jensen Shannon Pairwise Calculation: {end_time_jsd_pairwise - start_time_jsd_pairwise:.2f} seconds")
+
+
 # # Transformer Class
 
-# In[22]:
+# In[ ]:
 
 
 import torch
@@ -1079,7 +1146,7 @@ class IceForecastTransformer(nn.Module):
 
 # # Training Loop
 
-# In[23]:
+# In[ ]:
 
 
 if TRAINING:
@@ -1196,7 +1263,7 @@ else:
 # 
 # # Save the Model
 
-# In[24]:
+# In[ ]:
 
 
 # Define the path where to save or load the model
@@ -1217,7 +1284,7 @@ else:
 
 # # Re-Load the Model
 
-# In[25]:
+# In[ ]:
 
 
 from NC_FILE_PROCESSING.metrics_and_plots import *
@@ -1245,75 +1312,6 @@ if EVALUATING_ON:
     loaded_model.to(device)
     
     print("Model loaded successfully!")
-
-
-# In[26]:
-
-
-# --- Conditional Data collection for Training and Validation Sets ---
-# SEE IF THIS CAN BE MORE EFFICIENT - HANGS FOR FULL DATASET
-if PLOT_DATA_SPLIT_DISTRIBUTION:
-    print("--- Collecting ground truth data from training and validation sets ---")
-    start_time_collect_data = time.perf_counter()
-    all_train_actual_values = []
-    all_val_actual_values = []
-    all_test_actual_values = []
-
-    for i, (sample_x, sample_y, *_) in enumerate(train_loader):
-        all_train_actual_values.append(sample_y.cpu().numpy().flatten())
-    
-    for i, (sample_x, sample_y, *_) in enumerate(val_loader):
-        all_val_actual_values.append(sample_y.cpu().numpy().flatten())
-
-    for i, (sample_x, sample_y, *_) in enumerate(test_loader):
-        all_test_actual_values.append(sample_y.cpu().numpy().flatten())
-
-    final_train_values = np.concatenate(all_train_actual_values)
-    final_val_values = np.concatenate(all_val_actual_values)
-    final_test_values = np.concatenate(all_test_actual_values)
-
-    print("--- Finished collecting ground truth data from training and validation sets --")
-    print(f"Elapsed time for plotting data distribution comparison: {time.perf_counter() - start_time_collect_data:.2f} seconds")
-
-    
-else:
-    # Define empty arrays if not plotting distribution to avoid NameError later
-    final_train_values = np.array([])
-    final_val_values = np.array([])
-
-# 9. Conditional Plotting All Three SIC Distributions (Train, Val, Test Sets)
-# This block plots the distribution of SIC values across training, validation, and test sets.
-if PLOT_DATA_SPLIT_DISTRIBUTION:
-    logging.info("\nPlotting data distributions (Train, Val, Test)...")
-    print("\n--- Plotting data distributions (Train, Val, Test) ---")
-    start_time_plot_data_dist = time.perf_counter()
-    plot_sic_distribution_bars(
-        train_data=final_train_values,
-        val_data=final_val_values,
-        test_data=final_test_values,
-        start_date=train_set_start_year,
-        end_date=test_set_end_year,
-        num_bins=10
-    )
-    print(f"Elapsed time for plotting data distribution comparison: {time.perf_counter() - start_time_plot_data_dist:.2f} seconds")
-
-    # Calculate Pairwise Jensen-Shannon Distances for Data Splits
-    # This calculates the Jensen-Shannon Distance between the distributions of the data splits.
-    print("\n--- Pairwise Jensen-Shannon Distances for Data Splits ---")
-    start_time_jsd_pairwise = time.perf_counter()
-    distributions_for_jsd = {
-        'train': final_train_values,
-        'validation': final_val_values,
-        'test': final_test_values
-    }
-    
-    jsd_bins = np.linspace(0, 1, 10 + 1) # 10 bins for JSD calculation
-    pairwise_jsd_results = jensen_shannon_distance_pairwise(distributions_for_jsd, jsd_bins)
-    
-    for pair, jsd_val in pairwise_jsd_results.items():
-        print(f"JSD ({pair}): {jsd_val:.4f}")
-    end_time_jsd_pairwise = time.perf_counter()
-    print(f"Elapsed time for Jensen Shannon Pairwise Calculation: {end_time_jsd_pairwise - start_time_jsd_pairwise:.2f} seconds")
 
 
 # # Metrics
@@ -1438,8 +1436,10 @@ if EVALUATING_ON:
         all_predicted_sie_data.extend(batch_predicted_sie)
         all_actual_sie_data.extend(batch_actual_sie)
 
-    print(len(all_sic_dates))
-    print(len(all_sie_dates))
+    print(len(all_predicted_sic_data))
+    print(len(all_actual_sic_data))
+    print(len(all_predicted_sie_data))
+    print(len(all_actual_sie_data))
     
     # --- Create and Save Xarray Datasets to Zarr ---
     print("\nCreating and saving Zarr stores...")
@@ -1448,7 +1448,7 @@ if EVALUATING_ON:
     # Zarr path for SIC degradation data
     sic_zarr_path = f'{model_version}_sic.zarr'
     
-    if all_sic_dates:
+    if all_predicted_sic_data and all_actual_sic_data:
         # We need to reshape the SIC data from a list of 1D arrays to a single 2D array
         # Let's assume all_predicted_sic_data has shape (num_time_steps, num_cells)
         predicted_sic_stack = np.stack(all_predicted_sic_data)
@@ -1461,8 +1461,8 @@ if EVALUATING_ON:
                 'actual': (('date_forecast', 'cell'), actual_sic_stack),
             },
             coords={
-                'date': (('date_forecast'), all_sic_dates),
-                'forecast_step': (('date_forecast'), all_sic_forecast_steps),
+                'date': (('date_forecast'), all_dates),
+                'forecast_step': (('date_forecast'), all_forecast_steps),
                 'cell': (('cell'), np.arange(predicted_sic_stack.shape[1])),
             }
         )
@@ -1474,8 +1474,8 @@ if EVALUATING_ON:
         
     # Zarr path for SIE degradation data
     sie_zarr_path = f'{model_version}_sie.zarr'
-    
-    if all_sie_dates:
+
+    if all_predicted_sie_data and all_actual_sie_data:
         # SIE data is simpler, already 1D lists
         sie_ds = xr.Dataset(
             {
@@ -1483,8 +1483,8 @@ if EVALUATING_ON:
                 'actual_sie_km': (('date_forecast'), np.array(all_actual_sie_data)),
             },
             coords={
-                'date': (('date_forecast'), all_sie_dates),
-                'forecast_step': (('date_forecast'), all_sie_forecast_steps),
+                'date': (('date_forecast'), all_dates),
+                'forecast_step': (('date_forecast'), all_forecast_steps),
             }
         )
         
@@ -1493,148 +1493,8 @@ if EVALUATING_ON:
         print(f"Saved SIE performance degradation data to {sie_zarr_path}")
         logging.info(f"Saved SIE performance degradation data to {sie_zarr_path}")
 
-    end_full_evaluation = time.perf_counter()
-    total_eval_time = end_full_evaluation - start_full_evaluation
-    print(f"\nTotal evaluation and metric calculation took: {total_eval_time:.2f} seconds.")
-    logging.info(f"\nTotal evaluation and metric calculation took: {total_eval_time:.2f} seconds.")
-    
     end_time_test_eval = time.perf_counter()
-    print(f"Elapsed time for saving SIC and SIE performance degradation csvs: {end_time_test_eval - start_time_test_eval:.2f} seconds")
-
-
-# In[ ]:
-
-
-if EVALUATING_ON:
-    start_full_evaluation = time.perf_counter()
-    # Create a string buffer to capture output
-    captured_output = io.StringIO()
-    
-    # Redirect stdout to the buffer
-    sys.stdout = captured_output
-
-    # --- CALL METRIC FUNCTIONS HERE ---
-    
-    logging.info("\nCalling SIC plotting functions...")
-    # 1. Calculate and Log Overall Spatial Errors (Overall SIC's MAE, MSE, RMSE)
-    # This function calculates and prints overall spatial error metrics.
-    logging.info("\nErrors Overall...")
-    start_time_spatial_errors = time.perf_counter()
-    if not sic_ds.empty:
-        calculate_and_log_spatial_errors(sic_ds, title_suffix=" (Overall)")
-    end_time_spatial_errors = time.perf_counter()
-    print(f"Elapsed time for Overall Spatial Error Calculation: {end_time_spatial_errors - start_time_spatial_errors:.2f} seconds")
-
-    # 2. Plot Temporal Degradation (SIC Over Each Forecast Day)
-    # This function plots MAE and RMSE degradation over the forecast horizon for SIC.
-    logging.info("\nTemporal Degradation (SIC) over forecast days ...")
-    start_time_sic_temporal_degradation = time.perf_counter()
-    if not sic_ds.empty:
-        plot_SIC_temporal_degradation(sic_ds, model_version, patching_strategy_abbr)
-    end_time_sic_temporal_degradation = time.perf_counter()
-    print(f"Elapsed time for SIC Temporal Degradation Plot: {end_time_sic_temporal_degradation - start_time_sic_temporal_degradation:.2f} seconds")
-
-    # 3. Plot Actual vs. Predicted SIC Distribution (Overall SIC)
-    # This function plots overlapping histograms of actual vs. predicted SIC values.
-    logging.info("\nDistance between actual and predicted ...")
-    start_time_actual_vs_predicted_sic_dist = time.perf_counter()
-    if not sic_ds.empty:
-        plot_actual_vs_predicted_sic_distribution(sic_ds, model_version, patching_strategy_abbr, num_bins=50, title_suffix=" (Overall)")
-    end_time_actual_vs_predicted_sic_dist = time.perf_counter()
-    print(f"Elapsed time for Overall Actual vs Predicted SIC histogram: {end_time_actual_vs_predicted_sic_dist - start_time_actual_vs_predicted_sic_dist:.2f} seconds")
-
-    logging.info("\nCalling SIE plotting functions...")
-    # 4. Log Classification Report (SIE as a binary value of SIC with 15% threshold)
-    # This function provides a classification report for Sea Ice Extent (SIE).
-    logging.info("\nClassification Report for SIE ...")
-    start_time_classification_report = time.perf_counter()
-    if not sic_ds.empty:
-        sie_threshold = 0.15 # Define sie_threshold
-        log_classification_report(sic_ds, threshold=sie_threshold)
-    end_time_classification_report = time.perf_counter()
-    print(f"Elapsed time for Overall Classification Report: {end_time_classification_report - start_time_classification_report:.2f} seconds")
-    
-    # 5. Plot Overall SIE Confusion Matrix (SIE here is derived as a binary value of SIC with 15% threshold)
-    # This function generates a confusion matrix plot for SIE classification.
-    logging.info("\nConfusion Matrix for SIE ...")
-    start_time_confusion_matrix = time.perf_counter()
-    if not sic_ds.empty:
-        plot_sie_confusion_matrix(sic_ds, threshold=sie_threshold, model_version=model_version, patching_strategy_abbr=patching_strategy_abbr, forecast_day=None) # None for overall
-    end_time_confusion_matrix = time.perf_counter()
-    print(f"Elapsed time for Overall Confusion Matrix Plot: {end_time_confusion_matrix - start_time_confusion_matrix:.2f} seconds")
-    
-    # 6. Plot Overall ROC Curve (SIE here is derived as a binary value of SIC with 15% threshold)
-    # This function plots the Receiver Operating Characteristic (ROC) curve and calculates AUC.
-    logging.info("\nROC Curve for SIE ...")
-    start_time_roc_curve = time.perf_counter()
-    if not sic_ds.empty:
-        plot_roc_curve(sic_ds, model_version=model_version, patching_strategy_abbr=patching_strategy_abbr, threshold=sie_threshold, forecast_day=None) # None for overall
-    end_time_roc_curve = time.perf_counter()
-    print(f"Elapsed time for Overall ROC Curve Plot: {end_time_roc_curve - start_time_roc_curve:.2f} seconds")
-
-    # 7. Plot F1-Score Degradation (SIE here is derived as a binary value of SIC with 15% threshold)
-    # This function plots the F1-score degradation for SIE classification.
-    logging.info("\nF1 Score for SIE ...")
-    start_time_f1_degradation = time.perf_counter()
-    if not sic_ds.empty: # F1-score uses the same SIC temporal data
-        plot_SIE_f1_score_degradation(sic_ds, model_version, patching_strategy_abbr, threshold=sie_threshold)
-    end_time_f1_degradation = time.perf_counter()
-    print(f"Elapsed time for F1-Score Degradation Plot: {end_time_f1_degradation - start_time_f1_degradation:.2f} seconds")
-
-    # 8. Plot SIE Degradation (SIE as the area that is ice in km^2)
-    # This function plots MAE and RMSE degradation over the forecast horizon for SIE in km^2.
-    logging.info("\nDegradation of SIE (as square kilometers) over the forecast window ...")
-    start_time_sie_kilometers_degradation = time.perf_counter()
-    if not sie_ds.empty:
-        plot_SIE_Kilometers_degradation(sie_ds, model_version, patching_strategy_abbr)
-    end_time_sie_kilometers_degradation = time.perf_counter()
-    print(f"Elapsed time for SIE Kilometers Degradation Plot: {end_time_sie_kilometers_degradation - start_time_sie_kilometers_degradation:.2f} seconds")
-
-        if PLOT_DAY_BY_DAY_METRICS:
-        
-        logging.info("\nPlotting per-day forecast analysis...")
-        # --- Optional: Per-Day Analysis for Classification Metrics and Distributions ---
-        # This section iterates through each forecast day to provide detailed metrics and plots.
-        print("\n############################################")
-        print("\n#   PER-DAY FORECAST ANALYSIS (Optional)   #")
-        print("\n############################################")
-        start_time_per_day_analysis = time.perf_counter()
-        for day in range(1, FORECAST_HORIZON + 1): # Loop through each forecast day
-            df_day = sic_ds[sic_ds['forecast_step'] == day]
-            if not df_day.empty:
-                print(f"\n--- Metrics for Forecast Day {day} ---")
-                
-                # Log Classification Report for specific day
-                log_classification_report(df_day['actual'].values, df_day['predicted'].values, threshold=sie_threshold)
-                
-                # Plot SIC distribution for specific day
-                plot_actual_vs_predicted_sic_distribution(
-                    df_day['actual'].values, df_day['predicted'].values, model_version, patching_strategy_abbr, num_bins=50, title_suffix=f" (Day {day})"
-                )
-    
-                # Plot Confusion Matrix for specific day
-                plot_sie_confusion_matrix(sic_ds, sie_threshold, model_version, patching_strategy_abbr, forecast_day=day)
-                
-                # Plot ROC Curve for specific day
-                plot_roc_curve(sic_ds, model_version, patching_strategy_abbr, sie_threshold, forecast_day=day)
-                
-            end_time_per_day_analysis = time.perf_counter()
-        print(f"Elapsed time for Per-Day Forecast Analysis: {end_time_per_day_analysis - start_time_per_day_analysis:.2f} seconds")
-
-    # END OF EVALUATION
-    end_full_evaluation = time.perf_counter()
-    print(f"Elapsed time for FULL EVALUATION: {end_full_evaluation - start_full_evaluation:.2f} seconds")
-    
-    print("\nEvaluation complete.")
-
-    # Restore stdout
-    sys.stdout = sys.__stdout__
-    
-    # Now, write the captured output to the file
-    with open(f'{model_version}_Metrics.txt', 'w') as f:
-        f.write(captured_output.getvalue())
-    
-    print(f"Metrics saved as {model_version}_Metrics.txt")
+    print(f"Elapsed time for saving SIC and SIE performance degradation zarrs: {end_time_test_eval - start_time_test_eval:.2f} seconds")
 
 
 # # Make a Single Prediction
