@@ -89,37 +89,42 @@ PATCHIFY_ABBREVIATIONS = {
 
 
 # --- Run Settings:
-#PATCHIFY_TO_USE = "rows"   # Change this to use other patching techniques
-
+MONTHLY =                      True
 TRIAL_RUN =                    False   # SET THIS TO USE THE PRACTICE SET (MUCH FASTER AND SMALLER, for debugging)
-NORMALIZE_ON =                 True    # SET THIS TO USE NORMALIZATION ON FREEBOARD (Results are independent of patchify used)
-TRAINING =                     False    # SET THIS TO RUN THE TRAINING LOOP (Use on full dataset for results)
-EVALUATING_ON =                False    # SET THIS TO RUN THE METRICS AT THE BOTTOM (Use on full dataset for results)
-PLOT_DAY_BY_DAY_METRICS =      False    # See a comparison of metrics per forecast day
+NORMALIZE_ON =                 False   # SET THIS TO USE NORMALIZATION ON FREEBOARD (Results are independent of patchify used)
+TRAINING =                     True    # SET THIS TO RUN THE TRAINING LOOP (Use on full dataset for results)
+EVALUATING_ON =                True    # SET THIS TO RUN THE METRICS AT THE BOTTOM (Use on full dataset for results)
+PLOT_DAY_BY_DAY_METRICS =      False   # See a comparison of metrics per forecast day
+MAP_WITH_CARTOPY_ON =          False   # Make sure the Cartopy library is included in the kernel
 
 # Only run ONCE for daily and once for monthly!!
 # Run Settings (already performed, not needed now - KEEP FALSE!!!)
-PLOT_DATA_SPLIT_DISTRIBUTION = True   # Run the data split function to see the train, val, test distribution
+PLOT_DATA_SPLIT_DISTRIBUTION = False   # Run the data split function to see the train, val, test distribution
 MAX_FREEBOARD_ON =            False   # To normalize with a pre-defined maximum for outlier handling
-MAP_WITH_CARTOPY_ON =         False   # Make sure the Cartopy library is included in the kernel
 
 # --- Time-Related Variables:
-CONTEXT_LENGTH = 7            # T: Number of historical time steps used for input
-#FORECAST_HORIZON = 7          # Number of future time steps to predict (ex. 1 day for next time step)
+CONTEXT_LENGTH = 12           # T: Number of historical time steps used for input
+FORECAST_HORIZON = 3          # Number of future time steps to predict (ex. 1 day for next time step)
 
 # --- Model Hyperparameters:
 D_MODEL = 128                 # d_model: Dimension of the transformer's internal representations (embedding dimension)
 N_HEAD = 8                    # nhead: Number of attention heads
 NUM_TRANSFORMER_LAYERS = 4    # num_layers: Number of TransformerEncoderLayers
-BATCH_SIZE = 16               # 16 for context/forecast of 7 and 3; lower for longer range; kernel may die with larger sizes
-NUM_EPOCHS = 10
+BATCH_SIZE = 4                # Monthly requires smaller batch size, because of fewer samples
+NUM_EPOCHS = 40
+
+# Note that when using multiple GPUs batch size will be multiplied by the number of GPUs available (x4).
+# Monthly: Use a batch size of 4 and num epochs of 20
+# Daily: Use a batch size of 16 for 3 day forecast; lower this for longer range; kernel may die with larger sizes
 
 # --- Performance-Related Variables:
 NUM_WORKERS = 64   # 64 worked fast for the 7 day forecast; too many workers causes it to stall out
 PREFETCH_FACTOR = 4 # 4 worked fast for the 7 day forecast (tried 16 for 4 GPUs, but ran out of shared memory; 8 works ok)
 
+# Daily: For 7 day forecast: num workers = 64; prefetch factor = 4
+
 # --- Feature-Related Variables:
-MAX_FREEBOARD_FOR_NORMALIZATION = 1    # Only works when you set MAX_FREEBOARD_ON too; bad results
+MAX_FREEBOARD_FOR_NORMALIZATION = 1    # Only works when you set MAX_FREEBOARD_ON too; Zarr files don't have this saved.
 
 # --- Space-Related Variables:
 LATITUDE_THRESHOLD = 40          # Determines number of cells and patches (could use -90 to use the entire dataset).
@@ -127,7 +132,7 @@ CELLS_PER_PATCH = 256            # L: Number of cells within each patch (based o
 
 # SLURM - CONVERT THIS TO A .PY FILE FIRST
 PATCHIFY_TO_USE = os.environ.get("SLURM_PATCHIFY_TO_USE", "rows") # for SLURM
-FORECAST_HORIZON = os.environ.get("SLURM_FORECAST_HORIZON", 7) # for SLURM
+FORECAST_HORIZON = os.environ.get("SLURM_FORECAST_HORIZON", 6) # for SLURM
 
 
 # ## Other Variables Dependent on Those Above ^
@@ -191,11 +196,6 @@ SPECIFIC_PARAMS = {
 # In[9]:
 
 
-if TRIAL_RUN:
-    model_mode = "tr" # Training Dataset
-else:
-    model_mode = "fd" # Full Dataset DAILY - TODO: MAKE MONTHLY OPTION
-
 if NORMALIZE_ON:
     if MAX_FREEBOARD_ON:
         norm = f"nT{MAX_FREEBOARD_FOR_NORMALIZATION}" # Using the specified max value
@@ -203,7 +203,7 @@ if NORMALIZE_ON:
         norm = "nTM" # Using the absolute max
 else:
     norm = "nF" # Normalization is off
-
+    
 # Get the abbreviation, with a fallback for functions not yet mapped
 patching_strategy_abbr = PATCHIFY_ABBREVIATIONS.get(PATCHIFY_TO_USE, "UNKNWN")
 
@@ -213,21 +213,23 @@ if patching_strategy_abbr == "UNKNWN":
 if TRAINING and not torch.cuda.is_available():
     raise ValueError("There is a problem with Torch not recognizing the GPUs")
 else:
-    
-    BATCH_SIZE = BATCH_SIZE * torch.cuda.device_count()
+    if torch.cuda.device_count() != 0:
+        BATCH_SIZE = BATCH_SIZE * torch.cuda.device_count()
     # import psutil
     # NUM_WORKERS = psutil.cpu_count() - 2 # not working!
     # print(f"num_workers is {NUM_WORKERS}")
 
-# Model nome convention - fd:full data, etc.
+# Model nome convention
 model_version = (
-    f"{model_mode}_{norm}_D{D_MODEL}_B{BATCH_SIZE}_lt{LATITUDE_THRESHOLD}_P{NUM_PATCHES}_L{CELLS_PER_PATCH}"
+    f"{'M' if MONTHLY else 'D'}" # MONTHLY OR DAILY
+    f"{'tr' if TRIAL_RUN else 'fd'}_" # TRIAL DATASET OR FULL DATASET
+    f"{norm}_D{D_MODEL}_B{BATCH_SIZE}_lt{LATITUDE_THRESHOLD}_P{NUM_PATCHES}_L{CELLS_PER_PATCH}"
     f"_T{CONTEXT_LENGTH}_Fh{FORECAST_HORIZON}_e{NUM_EPOCHS}_{patching_strategy_abbr}"
 )
 
 # Place to save and load the data
 PROCESSED_DATA_DIR = (
-    f"{model_mode}_{norm}_preprocessed_data.zarr"
+    f"{'Monthly_' if MONTHLY else 'Daily_'}{'tr' if TRIAL_RUN else 'fd'}_{norm}_data.zarr"
 )
 
 print(f"Model Version: {model_version}")
@@ -374,7 +376,7 @@ import logging
 # Set level to logging.INFO to see the statements
 logging.basicConfig(filename=f'{model_version}_dataset.log', filemode='w', level=logging.INFO)
 
-class DailyNetCDFDataset(Dataset):
+class MonthlyOrDailyNetCDFDataset(Dataset):
     """
     PyTorch Dataset that concatenates a directory of month-wise NetCDF files
     along their 'Time' dimension and yields daily data *plus* its timestamp.
@@ -386,9 +388,9 @@ class DailyNetCDFDataset(Dataset):
     processed_data_path
         The Zarr directory from which to retrieve the preprocesed data  
     context_length
-        The number of days to fetch for input in the prediction step (needed for __len__)
+        The number of time steps to fetch for input in the prediction step (needed for __len__)
     forecast_horizon
-        The number of days to predict in the future (needed for __len__)
+        The number of time steps to predict in the future (needed for __len__)
     load_normalized
         Determines which version of the pre-processed data to load
     num_patches
@@ -407,7 +409,7 @@ class DailyNetCDFDataset(Dataset):
         transform: Callable = None,
 
         # File parameters
-        processed_data_path: str = "./",
+        processed_data_path: str = PROCESSED_DATA_DIR,
 
         # For __len__ function
         context_length: int = CONTEXT_LENGTH,
@@ -444,15 +446,14 @@ class DailyNetCDFDataset(Dataset):
         self.processed_data_path = processed_data_path # Store the processed data path
 
         # --- 1. Load pre-processed data from Zarr ---
-        zarr_filename = f"{model_mode}_{norm}_preprocessed_data.zarr"
-        full_zarr_path = os.path.join(self.processed_data_path, zarr_filename)
-
-        if not os.path.exists(full_zarr_path):
-            raise FileNotFoundError(f"Pre-processed Zarr file not found at {full_zarr_path}. Please run `preprocess_data_variables.py` first.")
+        if not os.path.exists(self.processed_data_path):
+            raise FileNotFoundError(f"Pre-processed Zarr file not found. Please run `preprocess_data_variables.py` first.")
 
         try:
             '''
-            Dimensions:         (nCells_full: 465044, time: 63875, nCells_masked: 53973)
+            Note that "time" will be 2100 for Monthly and 63875 for Daily
+            
+            Dimensions:         (nCells_full: 465044, time: 2100, nCells_masked: 53973)
             Coordinates:
               * nCells_full     (nCells_full) int64 4MB 0 1 2 3 ... 465041 465042 465043
               * nCells_masked   (nCells_masked) int64 432kB 0 1 2 3 ... 53970 53971 53972
@@ -466,22 +467,22 @@ class DailyNetCDFDataset(Dataset):
                 num_raw_files   int64 8B ...
                 times           (time) datetime64[ns] 511kB dask.array<chunksize=(31938,), meta=np.ndarray>
                 '''
-            processed_ds = xr.open_zarr(full_zarr_path)
+            processed_ds = xr.open_zarr(self.processed_data_path)
             print(processed_ds)
             logging.info(processed_ds)
 
             # Times
-            print(f"processed_ds['times'].values.shape: {processed_ds['times'].values.shape}  # Expected: (63875,)")
+            print(f"processed_ds['times'].values.shape: {processed_ds['times'].values.shape}  # Expected: ({'2100' if MONTHLY else '63875'},)")
             logging.info(f"times.shape = {processed_ds['times'].values.shape}")
             self.times = processed_ds["times"].values
             
             # Ice Area
-            print(f"processed_ds['ice_area'].load().values.shape: {processed_ds['ice_area'].load().values.shape}  # Expected: (63875, 53973)")
+            print(f"processed_ds['ice_area'].load().values.shape: {processed_ds['ice_area'].load().values.shape}  # Expected: ({'2100' if MONTHLY else '63875'}, 53973)")
             logging.info(f"ice_area.shape = {processed_ds['ice_area'].load().values.shape}")
             self.ice_area = processed_ds["ice_area"].load().values
             
             # Freeboard
-            print(f"processed_ds['freeboard'].load().values.shape: {processed_ds['freeboard'].load().values.shape}  # Expected: (63875, 53973)")
+            print(f"processed_ds['freeboard'].load().values.shape: {processed_ds['freeboard'].load().values.shape}  # Expected: ({'2100' if MONTHLY else '63875'}, 53973)")
             logging.info(f"freeboard.shape = {processed_ds['freeboard'].load().values.shape}")
             self.freeboard = processed_ds["freeboard"].load().values
             
@@ -542,27 +543,33 @@ class DailyNetCDFDataset(Dataset):
         logging.info(f"Patchifying completed in {time.perf_counter() - patchify_start_time:.2f} seconds.")
 
         # Stats on how many dates there are
-        logging.info(f"Total days collected: {len(self.times)}")
-        logging.info(f"Unique days: {len(np.unique(self.times))}")
-        logging.info(f"First 35 days: {self.times[:35]}")
-        logging.info(f"Last 35 days: {self.times[-35:]}")
+        logging.info(f"Total time steps collected (days or months): {len(self.times)}")
+        logging.info(f"Unique times: {len(np.unique(self.times))}")
+        logging.info(f"First 35 time values: {self.times[:35]}") # TODO: MAYBE CHANGE FOR MONTHS?
+        logging.info(f"Last 35 time values: {self.times[-35:]}")
 
         logging.info(f"Shape of combined ice_area array: {self.ice_area.shape}")
         logging.info(f"Shape of combined freeboard array: {self.freeboard.shape}")
 
-        logging.info(f"Elapsed time for DailyNetCDFDataset __init__: {time.perf_counter() - start_time} seconds")
-        print(f"Elapsed time for DailyNetCDFDataset __init__: {time.perf_counter() - start_time} seconds")
+        logging.info(f"Elapsed time for MonthlyOrDailyNetCDFDataset __init__: {time.perf_counter() - start_time} seconds")
+        print(f"Elapsed time for MonthlyOrDailyNetCDFDataset __init__: {time.perf_counter() - start_time} seconds")
 
     def __len__(self):
         """
         Returns the total number of possible starting indices (idx) for a valid sequence.
-        A valid sequence needs `self.context_length` days for input and `self.forecast_horizon` days for target.
+        A valid sequence needs `self.context_length` for input and `self.forecast_horizon` for the target.
         
         ex) For daily data, if the total number of days is 365, 
         the context_length is 7 and the forecast_horizon is 3, then
         
         365 - (7 + 3) + 1 = 365 - 10 + 1 = 356 is the final valid starting index
+
+        ex) For monthly data, if the total number of months is 12, 
+        the context_length is 6 and the forecast_horizon is 3, then
+        12 - (6 + 3) + 1 = 12 - 9 + 1 = 4 is the final valid starting index
+
         return len(self.freeboard) - (self.context_length + self.forecast_horizon)
+                
         """
         required_length = self.context_length + self.forecast_horizon
 
@@ -573,26 +580,26 @@ class DailyNetCDFDataset(Dataset):
         # The number of valid starting indices
         return len(self.freeboard) - required_length + 1
 
-    def get_patch_tensor(self, day_idx: int) -> torch.Tensor:
+    def get_patch_tensor(self, time_step_idx: int) -> torch.Tensor:
         
         """
-        Retrieves the feature data for a specific day, organized into patches.
+        Retrieves the feature data for a specific time step, organized into patches.
 
-        This method extracts 'freeboard' and 'ice_area' data for a given day
+        This method extracts 'freeboard' and 'ice_area' data for a given time step (month or day)
         and then reshapes it according to the pre-defined patches. Each patch
         will contain its own set of feature values.
 
         Parameters
         ----------
-        day_idx : int
-            The integer index of the day to retrieve data for, relative to the
+        time_step_idx : int
+            The integer index of the time step to retrieve data for, relative to the
             concatenated dataset's time dimension.
 
         Returns
         -------
         torch.Tensor
             A tensor containing the feature data organized by patches for the
-            specified day.
+            specified month or day.
             Shape: (context_length, num_patches, num_features, patch_size)
             Where:
             - num_patches: Total number of patches (ex., 210).
@@ -601,9 +608,9 @@ class DailyNetCDFDataset(Dataset):
             
         """
 
-        freeboard_day = self.freeboard[day_idx]  # (nCells,)
-        ice_area_day = self.ice_area[day_idx]    # (nCells,)
-        features = np.stack([freeboard_day, ice_area_day], axis=0)  # (2, nCells)
+        freeboard_now = self.freeboard[time_step_idx]  # (nCells,)
+        ice_area_now = self.ice_area[time_step_idx]    # (nCells,)
+        features = np.stack([freeboard_now, ice_area_now], axis=0)  # (2, nCells)
         patch_tensors = []
 
         for patch_indices in self.indices_per_patch_id:
@@ -621,12 +628,12 @@ class DailyNetCDFDataset(Dataset):
            Features are: [freeboard, ice_area] over masked cells. 
            
         """
-        # Start with the id of the day in question
+        # Start with the id of the time step (month or day) in question
         start_idx = idx
 
         # end_idx is the exclusive end of the input sequence,
         # and the inclusive start of the target sequence.
-        end_idx = idx + self.context_length    # ex. start day is 0, context length is 3, end is 3, exclusive
+        end_idx = idx + self.context_length    # ex. start is 0, context length is 3, end is 3, exclusive
         target_start = end_idx                 # target starts indexing at 3
 
         # the target sequence ends after forecast horizon
@@ -649,14 +656,14 @@ class DailyNetCDFDataset(Dataset):
         # Build target tensor: shape (forecast_horizon, num_patches)
         target_seq = self.ice_area[end_idx:target_end]
         target_patches = []
-        for day in target_seq:
-            patch_day = [
-                torch.tensor(day[patch_indices]) for patch_indices in self.indices_per_patch_id
+        for time_step in target_seq:
+            patch_time_step = [
+                torch.tensor(time_step[patch_indices]) for patch_indices in self.indices_per_patch_id
             ]
             
-            # After stacking, patch_day_tensor will be (num_patches, CELLS_PER_PATCH)
-            patch_day_tensor = torch.stack(patch_day)  # (num_patches,)
-            target_patches.append(patch_day_tensor)
+            # After stacking, patch_time_step_tensor will be (num_patches, CELLS_PER_PATCH)
+            patch_time_step_tensor = torch.stack(patch_time_step)  # (num_patches,)
+            target_patches.append(patch_time_step_tensor)
 
         # Final target tensor shape: (forecast_horizon, num_patches, CELLS_PER_PATCH)
         target_tensor = torch.stack(target_patches)  # (forecast_horizon, num_patches)
@@ -666,14 +673,18 @@ class DailyNetCDFDataset(Dataset):
     def __repr__(self):
         """ Format the string representation of the data """
         return (
-            f"<DailyNetCDFDataset: {len(self)} viable days (only includes up to the last possible input date), "
-            f"\n{len(self.freeboard[0])} cells/day"
+            f"<"
+            f"{self.processed_data_path}"
+            f"\nInstance of MonthlyOrDailyNetCDFDataset"
+            f"\n{len(self)} viable time steps (only includes up to the last possible input date)"
+            f"\n{len(self.freeboard[0])} cells/time_step"
             f"\n{self.num_raw_files} files loaded "
             f"\n{len(self.ice_area)} ice_area length"
             f"\n{len(self.freeboard)} freeboard length"
             f"\nPatchify Algorithm: {self.algorithm}" # What patchify algorithm was used
-            f"\n{self.ice_area.shape} shape of ice_area # Should be (63875, 53973) for latitude_threshold of 40"
-            f"\n{self.freeboard.shape} shape of freeboard # Should be (63875, 53973) for latitude_threshold of 40"
+            f"\n # The following should be ({'2100' if MONTHLY else '63875'}, 53973) for {'Monthly' if MONTHLY else 'Daily'} data at a latitude_threshold of 40"
+            f"\n{self.ice_area.shape} shape of ice_area"
+            f"\n{self.freeboard.shape} shape of freeboard"
             f"\n{len(self.indices_per_patch_id)} indices_per_patch_id # Should be {len(self.freeboard[0]) // CELLS_PER_PATCH}"
             f">" 
 
@@ -718,7 +729,7 @@ class YearlySubset(Dataset):
 
         # Calculate the number of viable samples within this subset.
         # A sample starts at index `i` of the raw_subset.
-        # A sample requires a total window of `context_length + forecast_horizon` days.
+        # A sample requires a total window of `context_length + forecast_horizon` time steps
         required_window_size = self.context_length + self.forecast_horizon
 
         # The last valid starting index in the raw_subset is its length minus the window size.
@@ -764,7 +775,7 @@ from torch.utils.data import Subset
 print(f"===== Making the Dataset Class: TRIAL_RUN MODE IS {TRIAL_RUN} ===== ")
 
 # load all the data from one folder
-dataset = DailyNetCDFDataset()
+dataset = MonthlyOrDailyNetCDFDataset()
 
 # Patch locations for positional embedding
 PATCH_LATLONS_TENSOR = torch.tensor(dataset.patch_latlons, dtype=torch.float32)
@@ -772,13 +783,13 @@ PATCH_LATLONS_TENSOR = torch.tensor(dataset.patch_latlons, dtype=torch.float32)
 print("========== SPLITTING THE DATASET ===================")
 # DIFFERENT SUBSET OPTIONS FOR TRAINING / VALIDATION / TESTING for the trial data vs. full dataset
 if TRIAL_RUN:
-    total_days = len(dataset)
-    train_end = int(total_days * 0.7)
-    val_end = int(total_days * 0.85)
+    total_time_steps = len(dataset)
+    train_end = int(total_time_steps * 0.7)
+    val_end = int(total_time_steps * 0.85)
     
     train_set = Subset(dataset, range(0, train_end))
     val_set   = Subset(dataset, range(train_end, val_end))
-    test_set  = Subset(dataset, range(val_end, total_days))
+    test_set  = Subset(dataset, range(val_end, total_time_steps))
     
 else:
 
@@ -824,17 +835,15 @@ print("Training data length:   ", len(train_set))
 print("Validation data length: ", len(val_set))
 print("Testing data length:    ", len(test_set))
 
-total_days = len(train_set) + len(val_set) + len(test_set)
-print("Total days = ", total_days)
+total_time_steps = len(train_set) + len(val_set) + len(test_set)
+print("Total Time Steps = ", total_time_steps)
 
 print("Number of training batches", len(train_set)//BATCH_SIZE)
-print("Number of training batches", len(val_set)//BATCH_SIZE)
-
+print("Number of validation batches", len(val_set)//BATCH_SIZE)
 print("Number of test batches after drop_last incomplete batch", len(test_set)//BATCH_SIZE)
-print("Number of test days to drop after drop_last incomplete batch", len(test_set)//BATCH_SIZE)
 
 print("===== Printing Dataset ===== ")
-print(dataset)                 # calls __repr__ → see how many files & days loaded
+print(dataset)                 # calls __repr__ → see how many files & time steps loaded
 
 print("===== Sample at dataset[0] ===== ")
 input_tensor, target_tensor, start_idx, end_idx, target_start, target_end = dataset[0]
@@ -913,6 +922,13 @@ val_loader   = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False,
                           num_workers=NUM_WORKERS, pin_memory=True, prefetch_factor=PREFETCH_FACTOR, drop_last=True)
 test_loader  = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=False,
                           num_workers=NUM_WORKERS, pin_memory=True, prefetch_factor=PREFETCH_FACTOR, drop_last=True)
+
+print(f"train_loader length: {len(train_loader)}")
+print(f"val_loader length: {len(val_loader)}")
+print(f"test_loader length: {len(test_loader)}")
+
+if len(val_loader) < 1 or len(test_loader) < 1:
+    raise ValueError("Make BATCH_SIZE smaller to avoid zero-length loaders")
 
 print("input_tensor should be of shape (context_length, num_patches, num_features, patch_size)")
 print(f"actual input_tensor.shape = {input_tensor.shape}")
@@ -1019,9 +1035,9 @@ class IceForecastTransformer(nn.Module):
         The total number of geographical patches that the `nCells` data was divided into.
         (ex., 256 patches).
     context_length : int, optional
-        The number of historical days (time steps) to use as input for the transformer.
+        The number of historical time steps (days or months) to use as input for the transformer.
     forecast_horizon : int, optional
-        The number of future days to predict for each patch.
+        The number of future time steps (days or months) to predict for each patch.
     d_model : int, optional
         The dimension of the model's hidden states (embedding dimension).
         This is the size of the vectors that flow through the Transformer encoder.
@@ -1058,11 +1074,11 @@ class IceForecastTransformer(nn.Module):
 
         """
         The transformer should
-        1. Accept a sequence of days (ex. 7 days of patches). 
-           The context_length parameter says how many days to use for input.
+        1. Accept a sequence of data (ex. 3 months of patches). 
+           The context_length parameter says how many time steps to use for input.
         2. Encode each patch with the transformer.
-        3. Output the patches for regression (ex. predict the 8th day).
-           The forecast_horizon parameter says how many days to use for the output prediction.
+        3. Output the patches for regression (ex. predict the 4th month).
+           The forecast_horizon parameter says how many time steps to use for the output prediction.
         
         """
 
@@ -1157,7 +1173,7 @@ class IceForecastTransformer(nn.Module):
 
 # # Training Loop
 
-# In[ ]:
+# In[24]:
 
 
 if TRAINING:
@@ -1237,7 +1253,7 @@ if TRAINING:
         # --- Validation loop ---
         model.eval()
         val_loss = 0
-        
+
         with torch.no_grad():
             for batch in val_loader:
                 # Unpack the full tuple
@@ -1282,7 +1298,7 @@ else:
 # 
 # # Save the Model
 
-# In[ ]:
+# In[25]:
 
 
 # Define the path where to save or load the model
@@ -1303,25 +1319,44 @@ else:
 
 # # Re-Load the Model
 
-# In[ ]:
+# In[26]:
 
 
 from NC_FILE_PROCESSING.metrics_and_plots import *
 
 if EVALUATING_ON:
-    
+
     import torch
     import torch.nn as nn
     
     if not torch.cuda.is_available():
         raise ValueError("There is a problem with Torch not recognizing the GPUs")
-    
+
+    print(PATH)
+
     # Instantiate the model (must have the same architecture as when it was saved)
     # Create an identical instance of the original __init__ parameters
     loaded_model = IceForecastTransformer()
     
-    # Load the saved state_dict (weights_only=True helps ensure safety of pickle files)
-    loaded_model.load_state_dict(torch.load(PATH, weights_only=True))
+    # Load the saved state_dict
+    # weights_only=True is good practice for safety
+    state_dict = torch.load(PATH, weights_only=True)
+
+    # Create an ordered dictionary to store the keys
+    from collections import OrderedDict
+    new_state_dict = OrderedDict()
+    
+    # Loop through the state_dict and remove the "module." prefix because of the multiple GPUs used
+    for k, v in state_dict.items():
+        if k.startswith('module.'):
+            name = k[7:]  # Remove the "module." prefix
+            new_state_dict[name] = v
+        else:
+            # In case some keys don't have the prefix (though unlikely for a DataParallel model)
+            new_state_dict[k] = v
+
+    # Load the modified state_dict into the model
+    loaded_model.load_state_dict(new_state_dict)
     
     # Set the model to evaluation mode
     loaded_model.eval()
@@ -1335,190 +1370,21 @@ if EVALUATING_ON:
 
 # # Metrics
 
-# In[ ]:
+# In[31]:
 
 
-# Updated EVALUATING_ON section
-if EVALUATING_ON:
-    import io
-    import time
-    import xarray as xr
-    import zarr
-    import pandas as pd
-    from NC_FILE_PROCESSING.metrics_and_plots import * 
-    
-    start_full_evaluation = time.perf_counter()
-    
-    nCells_array = np.load('cellAreas.npy')
-    
-    # Create a string buffer to capture output
-    captured_output = io.StringIO()
-    
-    # Redirect stdout to the buffer
-    sys.stdout = captured_output
-    
-    print("\nStarting evaluation and metric calculation...")
-    logging.info("\nStarting evaluation and metric calculation...")
-    print("==================")
-    print(f"DEBUG: Batch Size: {BATCH_SIZE} Days")
-    print(f"DEBUG: Context Length: {CONTEXT_LENGTH} Days")
-    print(f"DEBUG: Forecast Horizon: {FORECAST_HORIZON} Days")
-    print(f"DEBUG: Number of batches in test_loader (with drop_last=True): {len(test_loader)} Batches")
-    print("==================")
-    print(f"DEBUG: len(test_set): {len(dataset) - val_end} Days (approx, as test_set is not directly defined here)")
-    print(f"DEBUG: len(dataset) for splitting: {len(dataset)} Days")
-    print(f"DEBUG: train_end: {train_end} (must end before the end of the context window + forecast horizon)")
-    print(f"DEBUG: val_end: {val_end} (must end before the end of the context window + forecast horizon)")
-    print(f"DEBUG: range for test_set: {range(val_end, total_days)}")
-    print("==================")
-    
-    print("\n--- Running Test Set Evaluation for Temporal Degradation ---")
-    start_time_test_eval = time.perf_counter()
+get_ipython().run_cell_magic('capture', 'captured_output', '\nfrom scipy.stats import entropy\n\n# Accumulators for errors\nall_abs_errors = [] # To store absolute errors for each cell in each patch\nall_mse_errors = [] # To store MSE for each cell in each patch\n\n# Accumulators for histogram data\nall_predicted_values_flat = []\nall_actual_values_flat = []\n\nprint("\\nStarting evaluation and metric calculation...")\nprint("==================")\nprint(f"DEBUG: Batch Size: {BATCH_SIZE}")\nprint(f"DEBUG: Context Length: {CONTEXT_LENGTH}")\nprint(f"DEBUG: Forecast Horizon: {FORECAST_HORIZON}")\nprint(f"DEBUG: Number of batches in test_loader (with drop_last=True): {len(test_loader)} Batches")\nprint("==================")\nprint(f"DEBUG: len(test_set): {len(test_set)} Days")\nprint(f"DEBUG: len(dataset) for splitting: {len(dataset)} Days") # Should be 356\nprint(f"DEBUG: train_end: {train_end}")\nprint(f"DEBUG: val_end: {val_end}") # Should be 302\nprint(f"DEBUG: range for test_set: {range(val_end, total_time_steps)}") # Should be range(302, 356)\nprint("==================")\n\n# Iterate over the test_loader\n\n\nfor batch_idx, (sample_x, sample_y, \n                start_idx, end_idx, target_start, target_end) in enumerate(test_loader):\n    print(f"Processing batch {batch_idx+1}/{len(test_loader)}")\n\n    # Move to device and apply initial reshape as done in training\n    sample_x = sample_x.to(device)\n    sample_y = sample_y.to(device) # Actual target values\n    \n    # Initial reshape of x for the Transformer model\n    B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape\n    sample_x_reshaped = sample_x.view(B_sample, T_sample, P_sample, C_sample * L_sample)\n\n    # Perform inference\n    with torch.no_grad(): # Essential for inference to disable gradient calculations\n        predicted_y_patches = loaded_model(sample_x_reshaped)\n\n    # Ensure predicted_y_patches and sample_y have the same shape for comparison\n    # Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH)\n    if predicted_y_patches.shape != sample_y.shape:\n        print(f"Shape mismatch: Predicted {predicted_y_patches.shape}, Actual {sample_y.shape}")\n        continue # Skip this batch if shapes are incompatible\n\n    # Calculate errors for each cell in each patch, across the forecast horizon and batch\n    # The errors will implicitly be averaged over the batch when we take the mean later\n    diff = predicted_y_patches - sample_y\n    abs_error_batch = torch.abs(diff)\n    mse_error_batch = diff ** 2\n\n    # Accumulate errors (move to CPU for storage if memory is a concern)\n    all_abs_errors.append(abs_error_batch.cpu())\n    all_mse_errors.append(mse_error_batch.cpu())\n\n    # Collect data for histograms (flatten all values)\n    all_predicted_values_flat.append(predicted_y_patches.cpu().numpy().flatten())\n    all_actual_values_flat.append(sample_y.cpu().numpy().flatten())\n\n# Concatenate all accumulated tensors\nif all_abs_errors and all_mse_errors:\n    combined_abs_errors = torch.cat(all_abs_errors, dim=0) # Shape: (Total_Samples, FH, P, CPC)\n    combined_mse_errors = torch.cat(all_mse_errors, dim=0) # Shape: (Total_Samples, FH, P, CPC)\n\n    # Calculate average MSE and Absolute Error for each cell in each patch\n    # Average over batch size and forecast horizon\n    # Resulting shape: (NUM_PATCHES, CELLS_PER_PATCH)\n    mean_abs_error_per_cell_patch = combined_abs_errors.mean(dim=(0, 1)) # Average over batch and forecast horizon\n    mean_mse_per_cell_patch = combined_mse_errors.mean(dim=(0, 1)) # Average over batch and forecast horizon\n\n    print("\\n--- Error Metrics (Averaged per Cell per Patch) ---")\n    print(f"Mean Absolute Error (shape {mean_abs_error_per_cell_patch.shape}):")\n    # print(mean_abs_error_per_cell_patch) # Uncomment to see the full tensor\n    print(f"Overall Mean Absolute Error:            {mean_abs_error_per_cell_patch.mean().item():.4f}")\n\n    print(f"\\nMean Squared Error (shape {mean_mse_per_cell_patch.shape}):")\n    # print(mean_mse_per_cell_patch) # Uncomment to see the full tensor\n\n    mse = mean_mse_per_cell_patch.mean().item()\n    print(f"Overall Mean Squared Error:             {mse:.4f}")\n\n    rmse = np.sqrt(mse)\n    print(f"Overall Root Mean Squared Error (RMSE): {rmse}")\n    \nelse:\n    print("No data processed for error metrics. Check test_loader and data availability.")\n\n# --- Histogram and Jensen-Shannon Distance ---\n\n# Concatenate all flattened values\nif all_predicted_values_flat and all_actual_values_flat:\n    final_predicted_values = np.concatenate(all_predicted_values_flat)\n    final_actual_values = np.concatenate(all_actual_values_flat)\n\n    print(f"\\nTotal predicted values collected: {len(final_predicted_values)}")\n    print(f"Total actual values collected: {len(final_actual_values)}")\n\n    # Define bins for the histogram (e.g., for ice concentration between 0 and 1)\n    # Adjust bins based on the expected range of your data\n    bins = np.linspace(0, 1, 51) # 50 bins from 0 to 1\n\n    # Compute histograms\n    hist_predicted, _ = np.histogram(final_predicted_values, bins=bins, density=True)\n    hist_actual, _ = np.histogram(final_actual_values, bins=bins, density=True)\n\n    # Normalize histograms to sum to 1 (they are already density=True, but re-normalize for safety)\n    hist_predicted = hist_predicted / hist_predicted.sum()\n    hist_actual = hist_actual / hist_actual.sum()\n\n    # Jensen-Shannon Distance function\n    def jensen_shannon_distance(p, q):\n        """Calculates the Jensen-Shannon distance between two probability distributions."""\n        # Ensure distributions sum to 1\n        p = p / p.sum()\n        q = q / q.sum()\n\n        m = 0.5 * (p + q)\n        # Add a small epsilon to avoid log(0)\n        epsilon = 1e-10\n        jsd = 0.5 * (entropy(p + epsilon, m + epsilon) + entropy(q + epsilon, m + epsilon))\n        return np.sqrt(jsd) # JSD is the square root of JS divergence\n\n    # Calculate Jensen-Shannon Distance\n    jsd = jensen_shannon_distance(hist_actual, hist_predicted)\n    print(f"\\nJensen-Shannon Distance between actual and predicted histograms: {jsd:.4f}")\n\n    # Plotting Histograms\n    plt.figure(figsize=(10, 6))\n    plt.hist(final_actual_values, bins=bins, alpha=0.7, label=\'Actual Data\', color=\'skyblue\', density=True)\n    plt.hist(final_predicted_values, bins=bins, alpha=0.7, label=\'Predicted Data\', color=\'salmon\', density=True)\n    plt.title(\'Distribution of Actual vs. Predicted Ice Concentration Values\')\n    plt.xlabel(\'Ice Concentration Value\')\n    plt.ylabel(\'Probability Density\')\n    plt.legend()\n    plt.grid(axis=\'y\', alpha=0.75)\n    plt.savefig(f"SIE_Distribution_Actual_vs_Predicted_model_{model_version}.png")\n    plt.close()\n\n    # When reading the histograms, look for overlap:\n    # High Overlap: predictions are close to actual values. Decent model.\n    # Low Overlap: predictions differ from actual values, issues with the model. \n\nelse:\n    print("No data collected for histogram analysis. Check test_loader and data availability.")\n\nprint("\\nEvaluation complete.")\n\nwith open(f\'{model_version}_Metrics.txt\', \'w\') as f:\n    f.write(captured_output.stdout)\n')
 
-    # --- Data Accumulators for Xarray ---
-    # Accumulate data as lists of numpy arrays
-    # Initialize accumulators
-    all_predicted_sic_data = []
-    all_actual_sic_data = []
-    all_dates = []
-    all_forecast_steps = []
-    all_predicted_sie_data = []
-    all_actual_sie_data = []
 
-    # Pre-compute the mapping dictionary. This is still a good idea.
-    masked_to_full_dict = dataset.masked_to_full
-    indices_per_patch_id_list = dataset.indices_per_patch_id
-    
-    print("\n--- Running Test Set Evaluation for Temporal Degradation ---")
-    
-    for i, (sample_x, sample_y, start_idx, end_idx, target_start_idx, target_end_idx) in enumerate(test_loader):
-        # 1. Get model predictions for the whole batch
-        sample_x = sample_x.to(device)
-        
-        # Reshape for model input
-        B_sample, T_context, P_sample, C_sample, L_sample = sample_x.shape
-        sample_x_reshaped = sample_x.view(B_sample, T_context, P_sample, C_sample * L_sample)
-        
-        with torch.no_grad():
-            predicted_y_patches = loaded_model(sample_x_reshaped)
-        
-        # 2. Move data to CPU and convert to NumPy arrays once for the whole batch
-        predicted_patches_np = predicted_y_patches.detach().cpu().numpy()
-        actual_patches_np = sample_y.cpu().numpy()
-        
-        # 3. Process dates and forecast steps in a vectorized way (this part is fine)
-        batch_size, forecast_horizon = predicted_patches_np.shape[0], predicted_patches_np.shape[1]
-        
-        target_start_dates = dataset.times[target_start_idx]
-        target_start_dates_np = pd.to_datetime(target_start_dates).to_numpy()
-        forecast_steps = np.arange(1, forecast_horizon + 1)
-        
-        dates_for_batch = target_start_dates_np[:, np.newaxis] + pd.to_timedelta(forecast_steps - 1, unit='D').to_numpy()
-        
-        all_dates.extend(dates_for_batch.flatten().tolist())
-        all_forecast_steps.extend(np.tile(forecast_steps, batch_size).tolist())
-        
-        # --- reconstruction part ---
-        
-        # Get the number of patches for this specific batch
-        # This is `P_sample` from the reshaped input `sample_x`
-        
-        # We assume the patches in the batch are from a contiguous block of patch IDs
-        # This is a safe assumption for the DataLoader's `__getitem__`
-        batch_patch_indices_list = indices_per_patch_id_list[:P_sample]
-        batch_patch_indices_flat = np.concatenate(batch_patch_indices_list)
-        batch_full_indices_flat = np.array([masked_to_full_dict[idx] for idx in batch_patch_indices_flat])
-        
-        # Initialize temp arrays for the full grid for the entire batch
-        total_steps_in_batch = batch_size * forecast_horizon
-        total_grid_cells = len(dataset.latCell)
-        temp_predicted_grids = np.full((total_steps_in_batch, total_grid_cells), np.nan)
-        temp_actual_grids = np.full((total_steps_in_batch, total_grid_cells), np.nan)
-        
-        # Now, loop through each step in the batch, but use vectorized assignment inside
-        for step_idx in range(total_steps_in_batch):
-            # Flatten the patch data for this specific step
-            predicted_step_flat = predicted_patches_np.reshape(-1, P_sample, C_sample)[step_idx].flatten()
-            actual_step_flat = actual_patches_np.reshape(-1, P_sample, C_sample)[step_idx].flatten()
-            
-            # This single line replaces your slow nested Python loops!
-            temp_predicted_grids[step_idx, batch_full_indices_flat] = predicted_step_flat
-            temp_actual_grids[step_idx, batch_full_indices_flat] = actual_step_flat
-            
-        # 4. Calculate SIE for the entire batch in a vectorized way
-        batch_predicted_sie = calculate_full_sie_in_kilometers(temp_predicted_grids, nCells_array)
-        batch_actual_sie = calculate_full_sie_in_kilometers(temp_actual_grids, nCells_array)
-        
-        # 5. Append the large batch arrays to the lists
-        all_predicted_sic_data.append(temp_predicted_grids)
-        all_actual_sic_data.append(temp_actual_grids)
-        all_predicted_sie_data.extend(batch_predicted_sie)
-        all_actual_sie_data.extend(batch_actual_sie)
+# In[28]:
 
-    print(len(all_predicted_sic_data))
-    print(len(all_actual_sic_data))
-    print(len(all_predicted_sie_data))
-    print(len(all_actual_sie_data))
-    
-    # --- Create and Save Xarray Datasets to Zarr ---
-    print("\nCreating and saving Zarr stores...")
-    logging.info("\nCreating and saving Zarr stores...")
-    
-    # Zarr path for SIC degradation data
-    sic_zarr_path = f'{model_version}_sic.zarr'
-    
-    if all_predicted_sic_data and all_actual_sic_data:
-        # We need to reshape the SIC data from a list of 1D arrays to a single 2D array
-        # Let's assume all_predicted_sic_data has shape (num_time_steps, num_cells)
-        predicted_sic_stack = np.stack(all_predicted_sic_data)
-        actual_sic_stack = np.stack(all_actual_sic_data)
 
-        # Create the xarray Dataset for SIC
-        sic_ds = xr.Dataset(
-            {
-                'predicted': (('date_forecast', 'cell'), predicted_sic_stack),
-                'actual': (('date_forecast', 'cell'), actual_sic_stack),
-            },
-            coords={
-                'date': (('date_forecast'), all_dates),
-                'forecast_step': (('date_forecast'), all_forecast_steps),
-                'cell': (('cell'), np.arange(predicted_sic_stack.shape[1])),
-            }
-        )
-        
-        # Save to Zarr
-        sic_ds.to_zarr(sic_zarr_path, mode='w', compute=True)
-        print(f"Saved SIC performance degradation data to {sic_zarr_path}")
-        logging.info(f"Saved SIC performance degradation data to {sic_zarr_path}")
-        
-    # Zarr path for SIE degradation data
-    sie_zarr_path = f'{model_version}_sie.zarr'
-
-    if all_predicted_sie_data and all_actual_sie_data:
-        # SIE data is simpler, already 1D lists
-        sie_ds = xr.Dataset(
-            {
-                'predicted_sie_km': (('date_forecast'), np.array(all_predicted_sie_data)),
-                'actual_sie_km': (('date_forecast'), np.array(all_actual_sie_data)),
-            },
-            coords={
-                'date': (('date_forecast'), all_dates),
-                'forecast_step': (('date_forecast'), all_forecast_steps),
-            }
-        )
-        
-        # Save to Zarr
-        sie_ds.to_zarr(sie_zarr_path, mode='w', compute=True)
-        print(f"Saved SIE performance degradation data to {sie_zarr_path}")
-        logging.info(f"Saved SIE performance degradation data to {sie_zarr_path}")
-
-    end_time_test_eval = time.perf_counter()
-    print(f"Elapsed time for saving SIC and SIE performance degradation zarrs: {end_time_test_eval - start_time_test_eval:.2f} seconds")
+print("See Metrics.txt")
 
 
 # # Make a Single Prediction
 
-# In[ ]:
+# In[29]:
 
 
 if EVALUATING_ON:
@@ -1570,23 +1436,23 @@ if EVALUATING_ON:
         all_predicted_ice_areas = []
         all_actual_ice_areas = []
         
-        for day_idx in range(loaded_model.forecast_horizon):
-            predicted_day = predicted_y_patches[:, day_idx, :, :].cpu()
+        for time_step_idx in range(loaded_model.forecast_horizon):
+            predicted_day = predicted_y_patches[:, time_step_idx, :, :].cpu()
             all_predicted_ice_areas.append(predicted_day)
         
-            actual_day = sample_y[:, day_idx, :, :].cpu()
+            actual_day = sample_y[:, time_step_idx, :, :].cpu()
             all_actual_ice_areas.append(actual_day)
         
-            print(f"Processing forecast day {day_idx}: Predicted shape {predicted_day.shape}, Actual shape {actual_day.shape}")
+            print(f"Processing forecast day {time_step_idx}: Predicted shape {predicted_day.shape}, Actual shape {actual_day.shape}")
         
             # Save each day's prediction/actual data if needed
-            # np.save(f'patches/ice_area_patches_predicted_day{day_idx}.npy', predicted_day)
-            # np.save(f'patches/ice_area_patches_actual_day{day_idx}.npy', actual_day)
+            # np.save(f'patches/ice_area_patches_predicted_day{time_step_idx}.npy', predicted_day)
+            # np.save(f'patches/ice_area_patches_actual_day{time_step_idx}.npy', actual_day)
 
 
 # # Recover nCells from Patches for Visualization
 
-# In[ ]:
+# In[30]:
 
 
 if MAP_WITH_CARTOPY_ON:

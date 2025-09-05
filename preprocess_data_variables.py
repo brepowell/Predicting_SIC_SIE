@@ -12,7 +12,7 @@ from perlmutterpath import * # Contains data_dir, mesh_dir, etc.
 
 import logging
 
-logging.basicConfig(filename='variable_preprocessing.log', filemode='w', level=logging.INFO)
+logging.basicConfig(filename='monthly_variable_preprocessing.log', filemode='w', level=logging.INFO)
 
 # Constants (adjust if you use different units)
 D_WATER = 1023  # Density of seawater (kg/m^3)
@@ -79,8 +79,8 @@ def preprocess_and_save_variables_to_zarr(
     Performs data loading and freeboard calculation, saving the results to Zarr.
 
         Handle the raw data:
-        1) Gather the sorted daily data from each netCDF file (1 file = 1 month of daily data)
-            The netCDF files contain nCells worth of data per day for each feature (ice area, ice volume, etc.)
+        1) Gather the sorted monthly data from each netCDF file (1 file = 1 month of monthly data)
+            The netCDF files contain nCells worth of data per month for each feature (ice area, ice volume, etc.)
             nCells = 465044 with the IcoswISC30E3r5 mesh
         2) Load the mesh and initialize the cell mask
         3) Store a list of datetimes from each file 
@@ -107,8 +107,8 @@ def preprocess_and_save_variables_to_zarr(
     logging.info(f"Starting data preprocessing with model_mode={model_mode}, norm={norm}")
 
     # Define paths for the Zarr stores
-    zarr_path_unnormalized = os.path.join(output_dir, f"{model_mode}_{norm}_preprocessed_data.zarr")
-    zarr_path_normalized = os.path.join(output_dir, f"{model_mode}_{norm}_normalized_data.zarr")
+    zarr_path_unnormalized = os.path.join(output_dir, f"Monthly_{model_mode}_{norm}_preprocessed_data.zarr")
+    zarr_path_normalized = os.path.join(output_dir, f"Monthly_{model_mode}_{norm}_normalized_data.zarr")
 
     # This is the new, conditional logic block
     if os.path.exists(zarr_path_unnormalized):
@@ -117,8 +117,9 @@ def preprocess_and_save_variables_to_zarr(
         logging.info("Existing data loaded successfully.")
     else:
         logging.info("No existing un-normalized data found. Starting from scratch.")
-        # 1. Gather files (your existing logic)
-        file_pattern = os.path.join(data_dir, "v3.LR.historical_0051.mpassi.hist.am.timeSeriesStatsDaily.202*.nc") if trial_run else os.path.join(data_dir, "v3.LR.historical_0051.mpassi.hist.am.timeSeriesStatsDaily.*.nc")
+        
+        # 1. Gather files
+        file_pattern = os.path.join(data_dir, "v3.LR.historical_0051.mpassi.hist.am.timeSeriesStatsMonthly.202*.nc") if trial_run else os.path.join(data_dir, "v3.LR.historical_0051.mpassi.hist.am.timeSeriesStatsMonthly.*.nc")
         file_paths = sorted(glob.glob(file_pattern))
         if not file_paths:
             raise FileNotFoundError(f"No *.nc files found matching the pattern in {data_dir}")
@@ -126,7 +127,7 @@ def preprocess_and_save_variables_to_zarr(
         num_raw_files = len(file_paths)
         logging.info(f"Found {num_raw_files} NetCDF files.")
 
-        # 2. Load mesh and create mask (your existing logic)
+        # 2. Load mesh and create mask
         mesh = xr.open_dataset(mesh_dir)
         latCell = np.degrees(mesh["latCell"].values)
         cell_mask = latCell >= latitude_threshold
@@ -144,20 +145,20 @@ def preprocess_and_save_variables_to_zarr(
             combine='nested',
             concat_dim='Time',
             parallel=False,
-            data_vars=['timeDaily_avg_iceAreaCell', 'timeDaily_avg_iceVolumeCell', 'timeDaily_avg_snowVolumeCell', 'xtime_startDaily'],
+            data_vars=['timeMonthly_avg_iceAreaCell', 'timeMonthly_avg_iceVolumeCell', 'timeMonthly_avg_snowVolumeCell', 'xtime_startMonthly'],
             decode_times=True,
             engine='netcdf4',
             chunks={'Time': 30}
         ) as combined_ds:
-            xtime_byte_array = combined_ds["xtime_startDaily"].values
+            xtime_byte_array = combined_ds["xtime_startMonthly"].values
             xtime_unicode_array = xtime_byte_array.astype(str)
             xtime_cleaned_array = np.char.replace(xtime_unicode_array, "_", " ")
             times = np.asarray(xtime_cleaned_array, dtype='datetime64[s]')
             
-            # Use .compute() here to load into memory after masking
-            ice_area = combined_ds["timeDaily_avg_iceAreaCell"][:, cell_mask].compute().values
-            ice_volume_combined = combined_ds["timeDaily_avg_iceVolumeCell"][:, cell_mask].compute().values
-            snow_volume_combined = combined_ds["timeDaily_avg_snowVolumeCell"][:, cell_mask].compute().values
+            # Use .compute() to load into memory after masking
+            ice_area = combined_ds["timeMonthly_avg_iceAreaCell"][:, cell_mask].compute().values
+            ice_volume_combined = combined_ds["timeMonthly_avg_iceVolumeCell"][:, cell_mask].compute().values
+            snow_volume_combined = combined_ds["timeMonthly_avg_snowVolumeCell"][:, cell_mask].compute().values
 
         logging.info(f"Elapsed time for raw data loading and masking: {time.perf_counter() - start_time:.2f} seconds.")
 
