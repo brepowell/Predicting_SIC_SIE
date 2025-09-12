@@ -89,6 +89,7 @@ PATCHIFY_ABBREVIATIONS = {
 
 
 # --- Run Settings:
+
 MONTHLY =                      True
 TRIAL_RUN =                    False   # SET THIS TO USE THE PRACTICE SET (MUCH FASTER AND SMALLER, for debugging)
 NORMALIZE_ON =                 False   # SET THIS TO USE NORMALIZATION ON FREEBOARD (Results are independent of patchify used)
@@ -104,7 +105,6 @@ MAX_FREEBOARD_ON =            False   # To normalize with a pre-defined maximum 
 
 # --- Time-Related Variables:
 CONTEXT_LENGTH = 12           # T: Number of historical time steps used for input
-FORECAST_HORIZON = 3          # Number of future time steps to predict (ex. 1 day for next time step)
 
 # --- Model Hyperparameters:
 D_MODEL = 128                 # d_model: Dimension of the transformer's internal representations (embedding dimension)
@@ -114,7 +114,7 @@ BATCH_SIZE = 4                # Monthly requires smaller batch size, because of 
 NUM_EPOCHS = 40
 
 # Note that when using multiple GPUs batch size will be multiplied by the number of GPUs available (x4).
-# Monthly: Use a batch size of 4 and num epochs of 20
+# Monthly: Use a batch size of 4 and num epochs of 40 for best results
 # Daily: Use a batch size of 16 for 3 day forecast; lower this for longer range; kernel may die with larger sizes
 
 # --- Performance-Related Variables:
@@ -132,7 +132,7 @@ CELLS_PER_PATCH = 256            # L: Number of cells within each patch (based o
 
 # SLURM - CONVERT THIS TO A .PY FILE FIRST
 PATCHIFY_TO_USE = os.environ.get("SLURM_PATCHIFY_TO_USE", "rows") # for SLURM
-FORECAST_HORIZON = os.environ.get("SLURM_FORECAST_HORIZON", 6) # for SLURM
+FORECAST_HORIZON = int(os.environ.get("SLURM_FORECAST_HORIZON", 6)) # for SLURM
 
 
 # ## Other Variables Dependent on Those Above ^
@@ -1184,11 +1184,6 @@ if TRAINING:
     from torch import Tensor
     import torch.nn.functional as F
     
-    import logging
-    
-    # Set level to logging.INFO to see the statements
-    logging.basicConfig(filename='IceForecastTransformerInstance.log', filemode='w', level=logging.INFO)
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = IceForecastTransformer()
@@ -1370,21 +1365,175 @@ if EVALUATING_ON:
 
 # # Metrics
 
-# In[31]:
-
-
-get_ipython().run_cell_magic('capture', 'captured_output', '\nfrom scipy.stats import entropy\n\n# Accumulators for errors\nall_abs_errors = [] # To store absolute errors for each cell in each patch\nall_mse_errors = [] # To store MSE for each cell in each patch\n\n# Accumulators for histogram data\nall_predicted_values_flat = []\nall_actual_values_flat = []\n\nprint("\\nStarting evaluation and metric calculation...")\nprint("==================")\nprint(f"DEBUG: Batch Size: {BATCH_SIZE}")\nprint(f"DEBUG: Context Length: {CONTEXT_LENGTH}")\nprint(f"DEBUG: Forecast Horizon: {FORECAST_HORIZON}")\nprint(f"DEBUG: Number of batches in test_loader (with drop_last=True): {len(test_loader)} Batches")\nprint("==================")\nprint(f"DEBUG: len(test_set): {len(test_set)} Days")\nprint(f"DEBUG: len(dataset) for splitting: {len(dataset)} Days") # Should be 356\nprint(f"DEBUG: train_end: {train_end}")\nprint(f"DEBUG: val_end: {val_end}") # Should be 302\nprint(f"DEBUG: range for test_set: {range(val_end, total_time_steps)}") # Should be range(302, 356)\nprint("==================")\n\n# Iterate over the test_loader\n\n\nfor batch_idx, (sample_x, sample_y, \n                start_idx, end_idx, target_start, target_end) in enumerate(test_loader):\n    print(f"Processing batch {batch_idx+1}/{len(test_loader)}")\n\n    # Move to device and apply initial reshape as done in training\n    sample_x = sample_x.to(device)\n    sample_y = sample_y.to(device) # Actual target values\n    \n    # Initial reshape of x for the Transformer model\n    B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape\n    sample_x_reshaped = sample_x.view(B_sample, T_sample, P_sample, C_sample * L_sample)\n\n    # Perform inference\n    with torch.no_grad(): # Essential for inference to disable gradient calculations\n        predicted_y_patches = loaded_model(sample_x_reshaped)\n\n    # Ensure predicted_y_patches and sample_y have the same shape for comparison\n    # Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH)\n    if predicted_y_patches.shape != sample_y.shape:\n        print(f"Shape mismatch: Predicted {predicted_y_patches.shape}, Actual {sample_y.shape}")\n        continue # Skip this batch if shapes are incompatible\n\n    # Calculate errors for each cell in each patch, across the forecast horizon and batch\n    # The errors will implicitly be averaged over the batch when we take the mean later\n    diff = predicted_y_patches - sample_y\n    abs_error_batch = torch.abs(diff)\n    mse_error_batch = diff ** 2\n\n    # Accumulate errors (move to CPU for storage if memory is a concern)\n    all_abs_errors.append(abs_error_batch.cpu())\n    all_mse_errors.append(mse_error_batch.cpu())\n\n    # Collect data for histograms (flatten all values)\n    all_predicted_values_flat.append(predicted_y_patches.cpu().numpy().flatten())\n    all_actual_values_flat.append(sample_y.cpu().numpy().flatten())\n\n# Concatenate all accumulated tensors\nif all_abs_errors and all_mse_errors:\n    combined_abs_errors = torch.cat(all_abs_errors, dim=0) # Shape: (Total_Samples, FH, P, CPC)\n    combined_mse_errors = torch.cat(all_mse_errors, dim=0) # Shape: (Total_Samples, FH, P, CPC)\n\n    # Calculate average MSE and Absolute Error for each cell in each patch\n    # Average over batch size and forecast horizon\n    # Resulting shape: (NUM_PATCHES, CELLS_PER_PATCH)\n    mean_abs_error_per_cell_patch = combined_abs_errors.mean(dim=(0, 1)) # Average over batch and forecast horizon\n    mean_mse_per_cell_patch = combined_mse_errors.mean(dim=(0, 1)) # Average over batch and forecast horizon\n\n    print("\\n--- Error Metrics (Averaged per Cell per Patch) ---")\n    print(f"Mean Absolute Error (shape {mean_abs_error_per_cell_patch.shape}):")\n    # print(mean_abs_error_per_cell_patch) # Uncomment to see the full tensor\n    print(f"Overall Mean Absolute Error:            {mean_abs_error_per_cell_patch.mean().item():.4f}")\n\n    print(f"\\nMean Squared Error (shape {mean_mse_per_cell_patch.shape}):")\n    # print(mean_mse_per_cell_patch) # Uncomment to see the full tensor\n\n    mse = mean_mse_per_cell_patch.mean().item()\n    print(f"Overall Mean Squared Error:             {mse:.4f}")\n\n    rmse = np.sqrt(mse)\n    print(f"Overall Root Mean Squared Error (RMSE): {rmse}")\n    \nelse:\n    print("No data processed for error metrics. Check test_loader and data availability.")\n\n# --- Histogram and Jensen-Shannon Distance ---\n\n# Concatenate all flattened values\nif all_predicted_values_flat and all_actual_values_flat:\n    final_predicted_values = np.concatenate(all_predicted_values_flat)\n    final_actual_values = np.concatenate(all_actual_values_flat)\n\n    print(f"\\nTotal predicted values collected: {len(final_predicted_values)}")\n    print(f"Total actual values collected: {len(final_actual_values)}")\n\n    # Define bins for the histogram (e.g., for ice concentration between 0 and 1)\n    # Adjust bins based on the expected range of your data\n    bins = np.linspace(0, 1, 51) # 50 bins from 0 to 1\n\n    # Compute histograms\n    hist_predicted, _ = np.histogram(final_predicted_values, bins=bins, density=True)\n    hist_actual, _ = np.histogram(final_actual_values, bins=bins, density=True)\n\n    # Normalize histograms to sum to 1 (they are already density=True, but re-normalize for safety)\n    hist_predicted = hist_predicted / hist_predicted.sum()\n    hist_actual = hist_actual / hist_actual.sum()\n\n    # Jensen-Shannon Distance function\n    def jensen_shannon_distance(p, q):\n        """Calculates the Jensen-Shannon distance between two probability distributions."""\n        # Ensure distributions sum to 1\n        p = p / p.sum()\n        q = q / q.sum()\n\n        m = 0.5 * (p + q)\n        # Add a small epsilon to avoid log(0)\n        epsilon = 1e-10\n        jsd = 0.5 * (entropy(p + epsilon, m + epsilon) + entropy(q + epsilon, m + epsilon))\n        return np.sqrt(jsd) # JSD is the square root of JS divergence\n\n    # Calculate Jensen-Shannon Distance\n    jsd = jensen_shannon_distance(hist_actual, hist_predicted)\n    print(f"\\nJensen-Shannon Distance between actual and predicted histograms: {jsd:.4f}")\n\n    # Plotting Histograms\n    plt.figure(figsize=(10, 6))\n    plt.hist(final_actual_values, bins=bins, alpha=0.7, label=\'Actual Data\', color=\'skyblue\', density=True)\n    plt.hist(final_predicted_values, bins=bins, alpha=0.7, label=\'Predicted Data\', color=\'salmon\', density=True)\n    plt.title(\'Distribution of Actual vs. Predicted Ice Concentration Values\')\n    plt.xlabel(\'Ice Concentration Value\')\n    plt.ylabel(\'Probability Density\')\n    plt.legend()\n    plt.grid(axis=\'y\', alpha=0.75)\n    plt.savefig(f"SIE_Distribution_Actual_vs_Predicted_model_{model_version}.png")\n    plt.close()\n\n    # When reading the histograms, look for overlap:\n    # High Overlap: predictions are close to actual values. Decent model.\n    # Low Overlap: predictions differ from actual values, issues with the model. \n\nelse:\n    print("No data collected for histogram analysis. Check test_loader and data availability.")\n\nprint("\\nEvaluation complete.")\n\nwith open(f\'{model_version}_Metrics.txt\', \'w\') as f:\n    f.write(captured_output.stdout)\n')
-
-
 # In[28]:
 
 
-print("See Metrics.txt")
+from scipy.stats import entropy
+
+if EVALUATING_ON:    
+
+    # Accumulators for errors
+    all_abs_errors = [] # To store absolute errors for each cell in each patch
+    all_mse_errors = [] # To store MSE for each cell in each patch
+    
+    # Accumulators for histogram data
+    all_predicted_values_flat = []
+    all_actual_values_flat = []
+    
+    print("\nStarting evaluation and metric calculation...")
+    logging.info("\nStarting evaluation and metric calculation...")
+    print("==================")
+    print(f"DEBUG: Batch Size: {BATCH_SIZE}")
+    print(f"DEBUG: Context Length: {CONTEXT_LENGTH}")
+    print(f"DEBUG: Forecast Horizon: {FORECAST_HORIZON}")
+    print(f"DEBUG: Number of batches in test_loader (with drop_last=True): {len(test_loader)} Batches")
+    print("==================")
+    print(f"DEBUG: len(test_set): {len(test_set)} Days")
+    print(f"DEBUG: len(dataset) for splitting: {len(dataset)} Days") # Should be 356
+    print(f"DEBUG: train_end: {train_end}")
+    print(f"DEBUG: val_end: {val_end}") # Should be 302
+    print(f"DEBUG: range for test_set: {range(val_end, total_time_steps)}") # Should be range(302, 356)
+    print("==================")
+    
+    # Iterate over the test_loader
+
+    start_time_metrics = time.perf_counter()
+    
+    for batch_idx, (sample_x, sample_y, 
+                    start_idx, end_idx, target_start, target_end) in enumerate(test_loader):
+        print(f"Processing batch {batch_idx+1}/{len(test_loader)}")
+    
+        # Move to device and apply initial reshape as done in training
+        sample_x = sample_x.to(device)
+        sample_y = sample_y.to(device) # Actual target values
+
+        # Initial reshape of x for the Transformer model
+        B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape
+        sample_x_reshaped = sample_x.view(B_sample, T_sample, P_sample, C_sample * L_sample)
+
+        # Perform inference
+        with torch.no_grad(): # Essential for inference to disable gradient calculations
+            predicted_y_patches = loaded_model(sample_x_reshaped)
+
+        # Ensure predicted_y_patches and sample_y have the same shape for comparison
+        # Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH)
+        if predicted_y_patches.shape != sample_y.shape:
+            print(f"Shape mismatch: Predicted {predicted_y_patches.shape}, Actual {sample_y.shape}")
+            continue # Skip this batch if shapes are incompatible
+
+        # Calculate errors for each cell in each patch, across the forecast horizon and batch
+        # The errors will implicitly be averaged over the batch when we take the mean later
+        diff = predicted_y_patches - sample_y
+        abs_error_batch = torch.abs(diff)
+        mse_error_batch = diff ** 2
+
+        # Accumulate errors (move to CPU for storage if memory is a concern)
+        all_abs_errors.append(abs_error_batch.cpu())
+        all_mse_errors.append(mse_error_batch.cpu())
+
+        # Collect data for histograms (flatten all values)
+        all_predicted_values_flat.append(predicted_y_patches.cpu().numpy().flatten())
+        all_actual_values_flat.append(sample_y.cpu().numpy().flatten())
+
+    # --- Final Data Concatenation ---
+    if all_abs_errors and all_mse_errors:
+        combined_abs_errors = torch.cat(all_abs_errors, dim=0)
+        combined_mse_errors = torch.cat(all_mse_errors, dim=0)
+        mean_abs_error_per_cell_patch = combined_abs_errors.mean(dim=(0, 1)).numpy()
+        mean_mse_per_cell_patch = combined_mse_errors.mean(dim=(0, 1)).numpy()
+
+    if all_predicted_values_flat and all_actual_values_flat:
+        final_predicted_values = np.concatenate(all_predicted_values_flat)
+        final_actual_values = np.concatenate(all_actual_values_flat)
+
+    print("\n--- Error Metrics (Averaged per Cell per Patch) ---")
+    print(f"Mean Absolute Error (shape {mean_abs_error_per_cell_patch.shape}):")
+    # print(mean_abs_error_per_cell_patch) # Uncomment to see the full tensor
+    print(f"Overall Mean Absolute Error:            {mean_abs_error_per_cell_patch.mean().item():.4f}")
+
+    print(f"\nMean Squared Error (shape {mean_mse_per_cell_patch.shape}):")
+    # print(mean_mse_per_cell_patch) # Uncomment to see the full tensor
+
+    mse = mean_mse_per_cell_patch.mean().item()
+    print(f"Overall Mean Squared Error:             {mse:.4f}")
+
+    rmse = np.sqrt(mse)
+    print(f"Overall Root Mean Squared Error (RMSE): {rmse}")
+
+    # --- Save error arrays for later use with Cartopy ---
+    print("\n--- Saving Error Arrays ---")
+    np.save(f"{model_version}_MAE_per_cell_patch.npy", mean_abs_error_per_cell_patch)
+    np.save(f"{model_version}_MSE_per_cell_patch.npy", mean_mse_per_cell_patch)
+    print(f"Mean ABS Error array saved as {model_version}_MAE_per_cell_patch.npy")
+    print(f"Mean MSE Error array saved as {model_version}_MSE_per_cell_patch.npy")
+
+    # --- Sea Ice Extent (SIE) Prediction with Sklearn/Seaborn ---
+    print("\n--- Sea Ice Extent (SIE) Metrics (Threshold > 0.15) ---")
+
+    # Apply the threshold for sea ice extent (SIE)
+    threshold_cm = 0.15 
+    sie_actual_flat = np.where(final_actual_values > threshold_cm, 1, 0)
+    sie_predicted_flat = np.where(final_predicted_values > threshold_cm, 1, 0)
+
+    # Calculate and print classification report
+    print("\nClassification Report:")
+    report = classification_report(sie_actual_flat, sie_predicted_flat, target_names=['No Ice', 'Ice'], zero_division=0)
+    print(report)
+
+    # --- Plotting Confusion Matrix with Percentages ---
+    cm = confusion_matrix(sie_actual_flat, sie_predicted_flat)
+    cm_percent = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    annot_labels = np.array([
+        [f"{cm[0, 0]:,}\n({cm_percent[0, 0]:.2%})", f"{cm[0, 1]:,}\n({cm_percent[0, 1]:.2%})"],
+        [f"{cm[1, 0]:,}\n({cm_percent[1, 0]:.2%})", f"{cm[1, 1]:,}\n({cm_percent[1, 1]:.2%})"]
+    ])
+    fig, ax = plt.subplots(figsize=(10, 8))
+    sns.heatmap(cm, annot=annot_labels, fmt='', cmap='Blues', xticklabels=['No Ice', 'Ice'], yticklabels=['No Ice', 'Ice'], ax=ax)
+    ax.set_title(f'Sea Ice Extent Confusion Matrix (Threshold > {threshold_cm}) for {patching_strategy_abbr}', fontsize=16)
+    ax.set_ylabel('True Label')
+    ax.set_xlabel('Predicted Label')
+    plt.tight_layout()
+    plt.savefig(f"{model_version}_SIE_Confusion_Matrix.png")
+    plt.close()
+    print(f"\nConfusion matrix plot saved as {model_version}_SIE_Confusion_Matrix.png")
+
+    # --- ROC Curve and AUC Calculation with Sklearn ---
+    print("\n--- ROC Curve and AUC Metrics ---")
+
+    # Use the continuous predicted values and binary actual values
+    y_true_binary = np.where(final_actual_values > 0.15, 1, 0)
+    y_scores = final_predicted_values
+
+    # Calculate ROC curve data
+    fpr, tpr, thresholds = roc_curve(y_true_binary, y_scores)
+
+    # Calculate AUC score
+    auc = roc_auc_score(y_true_binary, y_scores)
+
+    # Plot the ROC curve
+    plt.figure(figsize=(8, 8))
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {auc:.4f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', label='Random guess')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate (FPR)')
+    plt.ylabel('True Positive Rate (TPR)')
+    plt.title(f'Receiver Operating Characteristic (ROC) Curve {patching_strategy_abbr}')
+    plt.legend(loc="lower right")
+    plt.grid(True)
+    plt.savefig(f"{model_version}_ROC_Curve.png")
+    plt.close()
+
+    print(f"\nArea Under the Curve (AUC): {auc:.4f}")
+    print(f"ROC curve plot saved as {model_version}_ROC_Curve.png")
+    # --- End of Sklearn ROC Curve Section ---
+
+    print(f"Elapsed time for metrics: {time.perf_counter() - start_time_metrics} seconds")
 
 
 # # Make a Single Prediction
 
-# In[29]:
+# In[ ]:
 
 
 if EVALUATING_ON:
@@ -1452,7 +1601,7 @@ if EVALUATING_ON:
 
 # # Recover nCells from Patches for Visualization
 
-# In[30]:
+# In[ ]:
 
 
 if MAP_WITH_CARTOPY_ON:
