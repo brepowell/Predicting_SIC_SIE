@@ -1,0 +1,288 @@
+Renamed job to: PECOM_h3_lon_spilldown
+Patchify strategy: lon_spilldown
+Forecast horizon: 3
+Xarray version 2025.6.1
+Zarr version 2.18.3
+Numpy version 2.2.6
+PyTorch version 2.5.1
+Total nCells:        465044
+Mask size:           53973
+cells_per_patch:     256
+n_patches:           210
+Model Version: peCOM_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh3_e40_LSD
+Dataset Name: Monthly_fd_nF_data.zarr
+System Version: 3.10.18 | packaged by conda-forge | (main, Jun  4 2025, 14:45:41) [GCC 13.3.0]
+Pandas version 2.3.1
+Matplotlib version 3.10.5
+Seaborn version 0.13.2
+Number of GPUs: 4
+Processor Name: x86_64
+Physical Cores: 64
+Logical Cores: 128
+Current CPU Frequency: 2916.70 MHz
+Min CPU Frequency: 1500.00 MHz
+Max CPU Frequency: 2450.00 MHz
+Total CPU Usage: 0.3%
+===== Making the Dataset Class: TRIAL_RUN MODE IS False ===== 
+<xarray.Dataset> Size: 922MB
+Dimensions:         (nCells_full: 465044, time: 2100, nCells_masked: 53973)
+Coordinates:
+  * nCells_full     (nCells_full) int64 4MB 0 1 2 3 ... 465041 465042 465043
+  * nCells_masked   (nCells_masked) int64 432kB 0 1 2 3 ... 53970 53971 53972
+  * time            (time) datetime64[ns] 17kB 1850-01-01T00:30:00 ... 2024-1...
+Data variables:
+    cell_mask       (nCells_full) bool 465kB dask.array<chunksize=(232522,), meta=np.ndarray>
+    freeboard       (time, nCells_masked) float32 453MB dask.array<chunksize=(132, 3374), meta=np.ndarray>
+    full_to_masked  <U1337572 5MB ...
+    ice_area        (time, nCells_masked) float32 453MB dask.array<chunksize=(132, 3374), meta=np.ndarray>
+    masked_to_full  <U1337572 5MB ...
+    num_raw_files   int64 8B ...
+    times           (time) datetime64[ns] 17kB dask.array<chunksize=(2100,), meta=np.ndarray>
+processed_ds['times'].values.shape: (2100,)  # Expected: (2100,)
+Type of self.times: <class 'numpy.ndarray'>
+Data type of elements in self.times: datetime64[ns]
+1850-01-01T00:30:00.000000000
+processed_ds['ice_area'].load().values.shape: (2100, 53973)  # Expected: (2100, 53973)
+processed_ds['freeboard'].load().values.shape: (2100, 53973)  # Expected: (2100, 53973)
+processed_ds['cell_mask'].values.shape: (465044,)  # Expected: (465044,)
+evaluated full_to_masked shape: 53973  # Expected: (53973,)
+evaluated masked_to_full shape: 53973  # Expected: (53973,)
+processed_ds['num_raw_files'].item(): 2100  # Expected: 2100
+Cluster sizes:
+min size 256
+max size 256
+smallest count (np.int64(114), 256)
+max count (np.int64(15), 256)
+number of patches: 210
+LAST PATCH SIZE:  256
+Contains a -1 index  False
+Elapsed time for MonthlyOrDailyNetCDFDataset __init__: 2.1525765189435333 seconds
+========== SPLITTING THE DATASET ===================
+Training data length:    1942
+Validation data length:  58
+Testing data length:     58
+Total Time Steps =  2058
+Number of training batches 121
+Number of validation batches 3
+Number of test batches after drop_last incomplete batch 3
+===== Printing Dataset ===== 
+<Monthly_fd_nF_data.zarr
+Instance of MonthlyOrDailyNetCDFDataset
+2086 viable time steps (only includes up to the last possible input date)
+53973 cells/time_step
+2100 files loaded 
+2100 ice_area length
+2100 freeboard length
+Patchify Algorithm: lon_spilldown
+ # The following should be (2100, 53973) for Monthly data at a latitude_threshold of 40
+(2100, 53973) shape of ice_area
+(2100, 53973) shape of freeboard
+210 indices_per_patch_id # Should be 210>
+===== Sample at dataset[0] ===== 
+Fetched start index 0: Time=1850-01-01T00:30:00.000000000
+Fetched end   index 12: Time=1851-01-01T00:30:00.000000000
+Fetched target start index 12: Time=1851-01-01T00:30:00.000000000
+Fetched target end   index 15: Time=1851-04-01T00:30:00.000000000
+Year is 1850
+Month is 1
+Day is 1
+===== Start and End Dates for Each Set =====
+Training set start date: 1850-01-01T00:30:00.000000000
+Training set end date (cosmetic): 2012-12-01T00:30:00.000000000
+(actual last viable target day): 2012-12-01T00:30:00.000000000
+Validation set start date: 2013-01-01T00:30:00.000000000
+Validation set end date (cosmetic): 2018-12-01T00:30:00.000000000
+(actual last viable target day): 2018-12-01T00:30:00.000000000
+Testing set start date: 2019-01-01T00:30:00.000000000
+Testing set end date (cosmetic): 2024-12-01T00:30:00.000000000
+(actual last viable target day): 2024-12-01T00:30:00.000000000
+===== Starting DataLoader ====
+train_loader length: 121
+val_loader length: 3
+test_loader length: 3
+input_tensor should be of shape (context_length, num_patches, num_features, patch_size)
+actual input_tensor.shape = torch.Size([12, 210, 2, 256])
+target_tensor should be of shape (forecast_horizon, num_patches, patch_size)
+actual target_tensor.shape = torch.Size([3, 210, 256])
+Calling IceForecastTransformer __init__
+Elapsed time: 0.02 seconds
+End of IceForecastTransformer __init__
+
+--- Model Architecture ---
+DataParallel(
+  (module): IceForecastTransformer(
+    (patch_embed): Linear(in_features=512, out_features=128, bias=True)
+    (pos_encoder): CombinedPositionalEncoder(
+      (temporal_encoder): TemporalPositionalEncoder(
+        (dropout): Dropout(p=0.1, inplace=False)
+      )
+      (spatial_encoder): SpatialPositionalEncoder(
+        (patch_embeddings): Embedding(210, 64)
+      )
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): TransformerEncoder(
+      (layers): ModuleList(
+        (0-3): 4 x TransformerEncoderLayer(
+          (self_attn): MultiheadAttention(
+            (out_proj): NonDynamicallyQuantizableLinear(in_features=128, out_features=128, bias=True)
+          )
+          (linear1): Linear(in_features=128, out_features=512, bias=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+          (linear2): Linear(in_features=512, out_features=128, bias=True)
+          (norm1): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+          (norm2): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+          (dropout1): Dropout(p=0.1, inplace=False)
+          (dropout2): Dropout(p=0.1, inplace=False)
+        )
+      )
+    )
+    (mlp_head): Sequential(
+      (0): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+      (1): Linear(in_features=128, out_features=768, bias=True)
+      (2): Sigmoid()
+    )
+  )
+)
+--------------------------
+
+Epoch 1/40 - Train Loss: 0.1894
+Validation Loss: 0.1353
+Epoch 2/40 - Train Loss: 0.1356
+Validation Loss: 0.1212
+Epoch 3/40 - Train Loss: 0.1294
+Validation Loss: 0.1104
+Epoch 4/40 - Train Loss: 0.1259
+Validation Loss: 0.1075
+Epoch 5/40 - Train Loss: 0.1221
+Validation Loss: 0.1044
+Epoch 6/40 - Train Loss: 0.1193
+Validation Loss: 0.1015
+Epoch 7/40 - Train Loss: 0.1146
+Validation Loss: 0.1007
+Epoch 8/40 - Train Loss: 0.1110
+Validation Loss: 0.1002
+Epoch 9/40 - Train Loss: 0.1081
+Validation Loss: 0.0956
+Epoch 10/40 - Train Loss: 0.1046
+Validation Loss: 0.0909
+Epoch 11/40 - Train Loss: 0.1009
+Validation Loss: 0.0885
+Epoch 12/40 - Train Loss: 0.0974
+Validation Loss: 0.0880
+Epoch 13/40 - Train Loss: 0.0926
+Validation Loss: 0.0796
+Epoch 14/40 - Train Loss: 0.0878
+Validation Loss: 0.0834
+Epoch 15/40 - Train Loss: 0.0844
+Validation Loss: 0.0755
+Epoch 16/40 - Train Loss: 0.0808
+Validation Loss: 0.0737
+Epoch 17/40 - Train Loss: 0.0778
+Validation Loss: 0.0734
+Epoch 18/40 - Train Loss: 0.0744
+Validation Loss: 0.0647
+Epoch 19/40 - Train Loss: 0.0697
+Validation Loss: 0.0736
+Epoch 20/40 - Train Loss: 0.0676
+Validation Loss: 0.0589
+Epoch 21/40 - Train Loss: 0.0634
+Validation Loss: 0.0620
+Epoch 22/40 - Train Loss: 0.0609
+Validation Loss: 0.0521
+Epoch 23/40 - Train Loss: 0.0583
+Validation Loss: 0.0513
+Epoch 24/40 - Train Loss: 0.0547
+Validation Loss: 0.0496
+Epoch 25/40 - Train Loss: 0.0511
+Validation Loss: 0.0449
+Epoch 26/40 - Train Loss: 0.0477
+Validation Loss: 0.0417
+Epoch 27/40 - Train Loss: 0.0452
+Validation Loss: 0.0430
+Epoch 28/40 - Train Loss: 0.0429
+Validation Loss: 0.0386
+Epoch 29/40 - Train Loss: 0.0407
+Validation Loss: 0.0359
+Epoch 30/40 - Train Loss: 0.0392
+Validation Loss: 0.0408
+Epoch 31/40 - Train Loss: 0.0374
+Validation Loss: 0.0341
+Epoch 32/40 - Train Loss: 0.0354
+Validation Loss: 0.0319
+Epoch 33/40 - Train Loss: 0.0339
+Validation Loss: 0.0339
+Epoch 34/40 - Train Loss: 0.0327
+Validation Loss: 0.0330
+Epoch 35/40 - Train Loss: 0.0315
+Validation Loss: 0.0293
+Epoch 36/40 - Train Loss: 0.0308
+Validation Loss: 0.0314
+Epoch 37/40 - Train Loss: 0.0296
+Validation Loss: 0.0286
+Epoch 38/40 - Train Loss: 0.0281
+Validation Loss: 0.0254
+Epoch 39/40 - Train Loss: 0.0276
+Validation Loss: 0.0328
+Epoch 40/40 - Train Loss: 0.0265
+Validation Loss: 0.0256
+===============================================
+Elapsed time for TRAINING: 734.60 seconds
+===============================================
+Saved model at peCOM_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh3_e40_LSD_model.pth
+peCOM_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh3_e40_LSD_model.pth
+Calling IceForecastTransformer __init__
+Elapsed time: 0.01 seconds
+End of IceForecastTransformer __init__
+Model loaded successfully!
+
+Starting evaluation and metric calculation...
+==================
+DEBUG: Batch Size: 16
+DEBUG: Context Length: 12
+DEBUG: Forecast Horizon: 3
+DEBUG: Number of batches in test_loader (with drop_last=True): 3 Batches
+==================
+DEBUG: len(test_set): 58 Days
+DEBUG: len(dataset) for splitting: 2086 Days
+DEBUG: train_end: 1955
+DEBUG: val_end: 2027
+DEBUG: range for test_set: range(2027, 2058)
+==================
+Processing batch 1/3
+Processing batch 2/3
+Processing batch 3/3
+
+--- Error Metrics (Averaged per Cell per Patch) ---
+Mean Absolute Error (shape (210, 256)):
+Overall Mean Absolute Error:            0.0926
+
+Mean Squared Error (shape (210, 256)):
+Overall Mean Squared Error:             0.0251
+Overall Root Mean Squared Error (RMSE): 0.1583711591249572
+
+--- Saving Error Arrays ---
+Mean ABS Error array saved as peCOM_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh3_e40_LSD_MAE_per_cell_patch.npy
+Mean MSE Error array saved as peCOM_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh3_e40_LSD_MSE_per_cell_patch.npy
+
+--- Sea Ice Extent (SIE) Metrics (Threshold > 0.15) ---
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      No Ice       0.99      0.88      0.93   5755618
+         Ice       0.73      0.97      0.83   1985822
+
+    accuracy                           0.90   7741440
+   macro avg       0.86      0.92      0.88   7741440
+weighted avg       0.92      0.90      0.90   7741440
+
+
+Confusion matrix plot saved as peCOM_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh3_e40_LSD_SIE_Confusion_Matrix.png
+
+--- ROC Curve and AUC Metrics ---
+
+Area Under the Curve (AUC): 0.9791
+ROC curve plot saved as peCOM_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh3_e40_LSD_ROC_Curve.png
+Elapsed time for metrics: 8.235486835008487 seconds
+Job finished at Fri 12 Sep 2025 01:28:17 AM PDT
