@@ -47,24 +47,6 @@ if EVALUATING_ON:
     end_time_classification_report = time.perf_counter()
     print(f"Elapsed time for Overall Classification Report: {end_time_classification_report - start_time_classification_report:.2f} seconds")
     
-    # 5. Plot Overall SIE Confusion Matrix (SIE here is derived as a binary value of SIC with 15% threshold)
-    # This function generates a confusion matrix plot for SIE classification.
-    logging.info("\nConfusion Matrix for SIE ...")
-    start_time_confusion_matrix = time.perf_counter()
-    if not sic_ds.empty:
-        plot_sie_confusion_matrix(sic_ds, threshold=sie_threshold, model_version=model_version, patching_strategy_abbr=patching_strategy_abbr, forecast_day=None) # None for overall
-    end_time_confusion_matrix = time.perf_counter()
-    print(f"Elapsed time for Overall Confusion Matrix Plot: {end_time_confusion_matrix - start_time_confusion_matrix:.2f} seconds")
-    
-    # 6. Plot Overall ROC Curve (SIE here is derived as a binary value of SIC with 15% threshold)
-    # This function plots the Receiver Operating Characteristic (ROC) curve and calculates AUC.
-    logging.info("\nROC Curve for SIE ...")
-    start_time_roc_curve = time.perf_counter()
-    if not sic_ds.empty:
-        plot_roc_curve(sic_ds, model_version=model_version, patching_strategy_abbr=patching_strategy_abbr, threshold=sie_threshold, forecast_day=None) # None for overall
-    end_time_roc_curve = time.perf_counter()
-    print(f"Elapsed time for Overall ROC Curve Plot: {end_time_roc_curve - start_time_roc_curve:.2f} seconds")
-
     # 7. Plot F1-Score Degradation (SIE here is derived as a binary value of SIC with 15% threshold)
     # This function plots the F1-score degradation for SIE classification.
     logging.info("\nF1 Score for SIE ...")

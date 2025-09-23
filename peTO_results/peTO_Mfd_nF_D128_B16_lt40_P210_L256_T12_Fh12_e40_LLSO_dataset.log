@@ -1,0 +1,206 @@
+INFO:root:<xarray.Dataset> Size: 922MB
+Dimensions:         (nCells_full: 465044, time: 2100, nCells_masked: 53973)
+Coordinates:
+  * nCells_full     (nCells_full) int64 4MB 0 1 2 3 ... 465041 465042 465043
+  * nCells_masked   (nCells_masked) int64 432kB 0 1 2 3 ... 53970 53971 53972
+  * time            (time) datetime64[ns] 17kB 1850-01-01T00:30:00 ... 2024-1...
+Data variables:
+    cell_mask       (nCells_full) bool 465kB dask.array<chunksize=(232522,), meta=np.ndarray>
+    freeboard       (time, nCells_masked) float32 453MB dask.array<chunksize=(132, 3374), meta=np.ndarray>
+    full_to_masked  <U1337572 5MB ...
+    ice_area        (time, nCells_masked) float32 453MB dask.array<chunksize=(132, 3374), meta=np.ndarray>
+    masked_to_full  <U1337572 5MB ...
+    num_raw_files   int64 8B ...
+    times           (time) datetime64[ns] 17kB dask.array<chunksize=(2100,), meta=np.ndarray>
+INFO:root:times.shape = (2100,)
+INFO:root:ice_area.shape = (2100, 53973)
+INFO:root:freeboard.shape = (2100, 53973)
+INFO:root:cell_mask.shape = (465044,)
+INFO:root:evaluated full_to_masked shape = ()
+INFO:root:evaluated masked_to_full shape = ()
+INFO:root:num_raw_files = 2100
+INFO:root:Loaded pre-processed data from Zarr in 1.79 seconds.
+INFO:root:=== Patchifying using latlon_spillover algorithm ===
+INFO:root:Longitude and latitude array shape: (210, 2) should be (n_patches, 2)
+INFO:root:Minimum latitude:  40.19468876687372
+INFO:root:Maximum latitude:  89.98816058534514
+INFO:root:Minimum longitude: 1.7114428498427814
+INFO:root:Maximum longitude: 359.33754102137556
+INFO:root:Should be between lat_threshold and 90 degrees for latitude
+INFO:root:Should be between 0 and 360 degrees for longitude
+INFO:root:Patchifying completed in 0.42 seconds.
+INFO:root:Total time steps collected (days or months): 2100
+INFO:root:Unique times: 2100
+INFO:root:First 35 time values: ['1850-01-01T00:30:00.000000000' '1850-02-01T00:30:00.000000000'
+ '1850-03-01T00:30:00.000000000' '1850-04-01T00:30:00.000000000'
+ '1850-05-01T00:30:00.000000000' '1850-06-01T00:30:00.000000000'
+ '1850-07-01T00:30:00.000000000' '1850-08-01T00:30:00.000000000'
+ '1850-09-01T00:30:00.000000000' '1850-10-01T00:30:00.000000000'
+ '1850-11-01T00:30:00.000000000' '1850-12-01T00:30:00.000000000'
+ '1851-01-01T00:30:00.000000000' '1851-02-01T00:30:00.000000000'
+ '1851-03-01T00:30:00.000000000' '1851-04-01T00:30:00.000000000'
+ '1851-05-01T00:30:00.000000000' '1851-06-01T00:30:00.000000000'
+ '1851-07-01T00:30:00.000000000' '1851-08-01T00:30:00.000000000'
+ '1851-09-01T00:30:00.000000000' '1851-10-01T00:30:00.000000000'
+ '1851-11-01T00:30:00.000000000' '1851-12-01T00:30:00.000000000'
+ '1852-01-01T00:30:00.000000000' '1852-02-01T00:30:00.000000000'
+ '1852-03-01T00:30:00.000000000' '1852-04-01T00:30:00.000000000'
+ '1852-05-01T00:30:00.000000000' '1852-06-01T00:30:00.000000000'
+ '1852-07-01T00:30:00.000000000' '1852-08-01T00:30:00.000000000'
+ '1852-09-01T00:30:00.000000000' '1852-10-01T00:30:00.000000000'
+ '1852-11-01T00:30:00.000000000']
+INFO:root:Last 35 time values: ['2022-02-01T00:30:00.000000000' '2022-03-01T00:30:00.000000000'
+ '2022-04-01T00:30:00.000000000' '2022-05-01T00:30:00.000000000'
+ '2022-06-01T00:30:00.000000000' '2022-07-01T00:30:00.000000000'
+ '2022-08-01T00:30:00.000000000' '2022-09-01T00:30:00.000000000'
+ '2022-10-01T00:30:00.000000000' '2022-11-01T00:30:00.000000000'
+ '2022-12-01T00:30:00.000000000' '2023-01-01T00:30:00.000000000'
+ '2023-02-01T00:30:00.000000000' '2023-03-01T00:30:00.000000000'
+ '2023-04-01T00:30:00.000000000' '2023-05-01T00:30:00.000000000'
+ '2023-06-01T00:30:00.000000000' '2023-07-01T00:30:00.000000000'
+ '2023-08-01T00:30:00.000000000' '2023-09-01T00:30:00.000000000'
+ '2023-10-01T00:30:00.000000000' '2023-11-01T00:30:00.000000000'
+ '2023-12-01T00:30:00.000000000' '2024-01-01T00:30:00.000000000'
+ '2024-02-01T00:30:00.000000000' '2024-03-01T00:30:00.000000000'
+ '2024-04-01T00:30:00.000000000' '2024-05-01T00:30:00.000000000'
+ '2024-06-01T00:30:00.000000000' '2024-07-01T00:30:00.000000000'
+ '2024-08-01T00:30:00.000000000' '2024-09-01T00:30:00.000000000'
+ '2024-10-01T00:30:00.000000000' '2024-11-01T00:30:00.000000000'
+ '2024-12-01T00:30:00.000000000']
+INFO:root:Shape of combined ice_area array: (2100, 53973)
+INFO:root:Shape of combined freeboard array: (2100, 53973)
+INFO:root:Elapsed time for MonthlyOrDailyNetCDFDataset __init__: 2.2151890559471212 seconds
+INFO:root:Training set start date: 1850-01-01T00:30:00.000000000
+INFO:root:Training set end date (cosmetic): 2012-12-01T00:30:00.000000000)
+INFO:root:(actual last viable target day): 2012-12-01T00:30:00.000000000
+INFO:root:Validation set start date: 2013-01-01T00:30:00.000000000
+INFO:root:Validation set end date (cosmetic): 2018-12-01T00:30:00.000000000)
+INFO:root:(actual last viable target day): 2018-12-01T00:30:00.000000000
+INFO:root:Testing set start date: 2019-01-01T00:30:00.000000000
+INFO:root:Testing set end date (cosmetic): 2024-12-01T00:30:00.000000000)
+INFO:root:(actual last viable target day): 2024-12-01T00:30:00.000000000
+INFO:root:
+--- Model Architecture ---
+INFO:root:DataParallel(
+  (module): IceForecastTransformer(
+    (patch_embed): Linear(in_features=512, out_features=128, bias=True)
+    (pos_encoder): TemporalPositionalEncoder(
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+    (encoder): TransformerEncoder(
+      (layers): ModuleList(
+        (0-3): 4 x TransformerEncoderLayer(
+          (self_attn): MultiheadAttention(
+            (out_proj): NonDynamicallyQuantizableLinear(in_features=128, out_features=128, bias=True)
+          )
+          (linear1): Linear(in_features=128, out_features=512, bias=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+          (linear2): Linear(in_features=512, out_features=128, bias=True)
+          (norm1): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+          (norm2): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+          (dropout1): Dropout(p=0.1, inplace=False)
+          (dropout2): Dropout(p=0.1, inplace=False)
+        )
+      )
+    )
+    (mlp_head): Sequential(
+      (0): LayerNorm((128,), eps=1e-05, elementwise_affine=True)
+      (1): Linear(in_features=128, out_features=3072, bias=True)
+      (2): Sigmoid()
+    )
+  )
+)
+INFO:root:Total model parameters: 1255296
+INFO:root:--------------------------
+
+INFO:root:== TIMER IS STARTING FOR TRAINING ==
+INFO:root:===============================
+INFO:root:       STARTING EPOCHS       
+INFO:root:===============================
+INFO:root:Number of epochs: 40
+INFO:root:Learning Rate: 0.0001
+INFO:root:Epoch 1/40 - Train Loss: 0.1621
+INFO:root:Epoch 1/40 - Validation Loss: 0.1062
+INFO:root:Epoch 2/40 - Train Loss: 0.0890
+INFO:root:Epoch 2/40 - Validation Loss: 0.0808
+INFO:root:Epoch 3/40 - Train Loss: 0.0753
+INFO:root:Epoch 3/40 - Validation Loss: 0.0684
+INFO:root:Epoch 4/40 - Train Loss: 0.0666
+INFO:root:Epoch 4/40 - Validation Loss: 0.0614
+INFO:root:Epoch 5/40 - Train Loss: 0.0625
+INFO:root:Epoch 5/40 - Validation Loss: 0.0572
+INFO:root:Epoch 6/40 - Train Loss: 0.0600
+INFO:root:Epoch 6/40 - Validation Loss: 0.0557
+INFO:root:Epoch 7/40 - Train Loss: 0.0591
+INFO:root:Epoch 7/40 - Validation Loss: 0.0551
+INFO:root:Epoch 8/40 - Train Loss: 0.0587
+INFO:root:Epoch 8/40 - Validation Loss: 0.0535
+INFO:root:Epoch 9/40 - Train Loss: 0.0582
+INFO:root:Epoch 9/40 - Validation Loss: 0.0529
+INFO:root:Epoch 10/40 - Train Loss: 0.0580
+INFO:root:Epoch 10/40 - Validation Loss: 0.0543
+INFO:root:Epoch 11/40 - Train Loss: 0.0580
+INFO:root:Epoch 11/40 - Validation Loss: 0.0543
+INFO:root:Epoch 12/40 - Train Loss: 0.0581
+INFO:root:Epoch 12/40 - Validation Loss: 0.0566
+INFO:root:Epoch 13/40 - Train Loss: 0.0581
+INFO:root:Epoch 13/40 - Validation Loss: 0.0539
+INFO:root:Epoch 14/40 - Train Loss: 0.0578
+INFO:root:Epoch 14/40 - Validation Loss: 0.0538
+INFO:root:Epoch 15/40 - Train Loss: 0.0577
+INFO:root:Epoch 15/40 - Validation Loss: 0.0532
+INFO:root:Epoch 16/40 - Train Loss: 0.0573
+INFO:root:Epoch 16/40 - Validation Loss: 0.0538
+INFO:root:Epoch 17/40 - Train Loss: 0.0572
+INFO:root:Epoch 17/40 - Validation Loss: 0.0538
+INFO:root:Epoch 18/40 - Train Loss: 0.0572
+INFO:root:Epoch 18/40 - Validation Loss: 0.0537
+INFO:root:Epoch 19/40 - Train Loss: 0.0573
+INFO:root:Epoch 19/40 - Validation Loss: 0.0524
+INFO:root:Epoch 20/40 - Train Loss: 0.0570
+INFO:root:Epoch 20/40 - Validation Loss: 0.0519
+INFO:root:Epoch 21/40 - Train Loss: 0.0567
+INFO:root:Epoch 21/40 - Validation Loss: 0.0516
+INFO:root:Epoch 22/40 - Train Loss: 0.0565
+INFO:root:Epoch 22/40 - Validation Loss: 0.0514
+INFO:root:Epoch 23/40 - Train Loss: 0.0564
+INFO:root:Epoch 23/40 - Validation Loss: 0.0512
+INFO:root:Epoch 24/40 - Train Loss: 0.0563
+INFO:root:Epoch 24/40 - Validation Loss: 0.0512
+INFO:root:Epoch 25/40 - Train Loss: 0.0562
+INFO:root:Epoch 25/40 - Validation Loss: 0.0508
+INFO:root:Epoch 26/40 - Train Loss: 0.0558
+INFO:root:Epoch 26/40 - Validation Loss: 0.0506
+INFO:root:Epoch 27/40 - Train Loss: 0.0557
+INFO:root:Epoch 27/40 - Validation Loss: 0.0509
+INFO:root:Epoch 28/40 - Train Loss: 0.0553
+INFO:root:Epoch 28/40 - Validation Loss: 0.0501
+INFO:root:Epoch 29/40 - Train Loss: 0.0544
+INFO:root:Epoch 29/40 - Validation Loss: 0.0501
+INFO:root:Epoch 30/40 - Train Loss: 0.0535
+INFO:root:Epoch 30/40 - Validation Loss: 0.0482
+INFO:root:Epoch 31/40 - Train Loss: 0.0523
+INFO:root:Epoch 31/40 - Validation Loss: 0.0488
+INFO:root:Epoch 32/40 - Train Loss: 0.0512
+INFO:root:Epoch 32/40 - Validation Loss: 0.0469
+INFO:root:Epoch 33/40 - Train Loss: 0.0499
+INFO:root:Epoch 33/40 - Validation Loss: 0.0487
+INFO:root:Epoch 34/40 - Train Loss: 0.0490
+INFO:root:Epoch 34/40 - Validation Loss: 0.0460
+INFO:root:Epoch 35/40 - Train Loss: 0.0470
+INFO:root:Epoch 35/40 - Validation Loss: 0.0431
+INFO:root:Epoch 36/40 - Train Loss: 0.0453
+INFO:root:Epoch 36/40 - Validation Loss: 0.0423
+INFO:root:Epoch 37/40 - Train Loss: 0.0439
+INFO:root:Epoch 37/40 - Validation Loss: 0.0403
+INFO:root:Epoch 38/40 - Train Loss: 0.0427
+INFO:root:Epoch 38/40 - Validation Loss: 0.0396
+INFO:root:Epoch 39/40 - Train Loss: 0.0417
+INFO:root:Epoch 39/40 - Validation Loss: 0.0385
+INFO:root:Epoch 40/40 - Train Loss: 0.0404
+INFO:root:Epoch 40/40 - Validation Loss: 0.0399
+INFO:root:===============================================
+INFO:root:Elapsed time for TRAINING: 861.38 seconds
+INFO:root:===============================================
+INFO:root:
+Starting evaluation and metric calculation...
