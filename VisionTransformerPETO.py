@@ -1707,7 +1707,7 @@ print("Model loaded successfully!")
 from scipy.stats import entropy
 
 if FAST_EVAL_ON:    
-
+   
     # Accumulators for errors
     all_abs_errors = [] # To store absolute errors for each cell in each patch
     all_mse_errors = [] # To store MSE for each cell in each patch
@@ -1724,23 +1724,28 @@ if FAST_EVAL_ON:
     print(f"DEBUG: Forecast Horizon: {FORECAST_HORIZON}")
     print(f"DEBUG: Number of batches in test_loader (with drop_last=True): {len(test_loader)} Batches")
     print("==================")
-    print(f"DEBUG: len(test_set): {len(test_set)} time steps")
-    print(f"DEBUG: len(dataset) for splitting: {len(dataset)} time steps")
+    print(f"DEBUG: len(test_set): {len(test_set)} Days")
+    print(f"DEBUG: len(dataset) for splitting: {len(dataset)} Days") # Should be 356
     print(f"DEBUG: train_end: {train_end}")
-    print(f"DEBUG: val_end: {val_end}")
-    print(f"DEBUG: range for test_set: {range(val_end, total_time_steps)}") 
-    # Should be range(302, 356) for daily and range(2027, 2058) for monthly
+    print(f"DEBUG: val_end: {val_end}") # Should be 302
+    print(f"DEBUG: range for test_set: {range(val_end, total_time_steps)}") # Should be range(302, 356)
     print("==================")
+    
+    # Iterate over the test_loader
 
     start_time_metrics = time.perf_counter()
     
-    for batch_idx, (sample_x, sample_y, 
-                    start_idx, end_idx, target_start, target_end) in enumerate(test_loader):
+    for batch_idx, (sample_x, sample_y, start_idx, end_idx, target_start, target_end, 
+                    years, months, days) in enumerate(test_loader):
+        
         print(f"Processing batch {batch_idx+1}/{len(test_loader)}")
     
         # Move to device and apply initial reshape as done in training
         sample_x = sample_x.to(device)
         sample_y = sample_y.to(device) # Actual target values
+        years = years.to(device)
+        months = months.to(device)
+        days = days.to(device)
 
         # Initial reshape of x for the Transformer model
         B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape
@@ -1748,7 +1753,7 @@ if FAST_EVAL_ON:
 
         # Perform inference
         with torch.no_grad(): # Essential for inference to disable gradient calculations
-            predicted_y_patches = loaded_model(sample_x_reshaped)
+            predicted_y_patches = loaded_model(sample_x_reshaped, years, months, days)
 
         # Ensure predicted_y_patches and sample_y have the same shape for comparison
         # Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH)
@@ -1784,7 +1789,7 @@ if FAST_EVAL_ON:
     #######
     # SIC #
     #######
-    
+
     print("\n--- Error Metrics (Averaged per Cell per Patch) ---")
     print(f"Mean Absolute Error (shape {mean_abs_error_per_cell_patch.shape}):")
     # print(mean_abs_error_per_cell_patch) # Uncomment to see the full tensor
@@ -1809,7 +1814,7 @@ if FAST_EVAL_ON:
     #######
     # SIE #
     #######
-    
+
     # --- Sea Ice Extent (SIE) Prediction with Sklearn/Seaborn ---
     print("\n--- Sea Ice Extent (SIE) Metrics (Threshold > 0.15) ---")
 
@@ -1901,6 +1906,9 @@ if SLOW_EVAL_ON:
         # Move to device and apply initial reshape as done in training
         sample_x = sample_x.to(device)
         sample_y = sample_y.to(device) # Actual target values
+        years = years.to(device)
+        months = months.to(device)
+        days = days.to(device)
 
         # Initial reshape of x for the Transformer model
         B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape
@@ -1908,7 +1916,7 @@ if SLOW_EVAL_ON:
 
         # Perform inference
         with torch.no_grad(): # Essential for inference to disable gradient calculations
-            predicted_y_patches = loaded_model(sample_x_reshaped)
+            predicted_y_patches = loaded_model(sample_x_reshaped, years, months, days)
 
         # Ensure predicted_y_patches and sample_y have the same shape for comparison
         # Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH)

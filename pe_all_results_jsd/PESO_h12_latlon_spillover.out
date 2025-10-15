@@ -1,0 +1,165 @@
+Renamed job to: PESO_h12_latlon_spillover
+Patchify strategy: latlon_spillover
+Forecast horizon: 12
+Xarray version 2025.6.1
+Zarr version 2.18.3
+Numpy version 2.2.6
+PyTorch version 2.5.1
+Total nCells:        465044
+Mask size:           53973
+cells_per_patch:     256
+n_patches:           210
+Model Version: peSO_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh12_e40_LLSO
+Dataset Name: Monthly_fd_nF_data.zarr
+System Version: 3.10.18 | packaged by conda-forge | (main, Jun  4 2025, 14:45:41) [GCC 13.3.0]
+Pandas version 2.3.1
+Matplotlib version 3.10.5
+Seaborn version 0.13.2
+Number of GPUs: 4
+Processor Name: x86_64
+Physical Cores: 64
+Logical Cores: 128
+Current CPU Frequency: 2645.02 MHz
+Min CPU Frequency: 1500.00 MHz
+Max CPU Frequency: 2450.00 MHz
+Total CPU Usage: 0.2%
+===== Making the Dataset Class: TRIAL_RUN MODE IS False ===== 
+<xarray.Dataset> Size: 922MB
+Dimensions:         (nCells_full: 465044, time: 2100, nCells_masked: 53973)
+Coordinates:
+  * nCells_full     (nCells_full) int64 4MB 0 1 2 3 ... 465041 465042 465043
+  * nCells_masked   (nCells_masked) int64 432kB 0 1 2 3 ... 53970 53971 53972
+  * time            (time) datetime64[ns] 17kB 1850-01-01T00:30:00 ... 2024-1...
+Data variables:
+    cell_mask       (nCells_full) bool 465kB dask.array<chunksize=(232522,), meta=np.ndarray>
+    freeboard       (time, nCells_masked) float32 453MB dask.array<chunksize=(132, 3374), meta=np.ndarray>
+    full_to_masked  <U1337572 5MB ...
+    ice_area        (time, nCells_masked) float32 453MB dask.array<chunksize=(132, 3374), meta=np.ndarray>
+    masked_to_full  <U1337572 5MB ...
+    num_raw_files   int64 8B ...
+    times           (time) datetime64[ns] 17kB dask.array<chunksize=(2100,), meta=np.ndarray>
+processed_ds['times'].values.shape: (2100,)  # Expected: (2100,)
+Type of self.times: <class 'numpy.ndarray'>
+Data type of elements in self.times: datetime64[ns]
+1850-01-01T00:30:00.000000000
+processed_ds['ice_area'].load().values.shape: (2100, 53973)  # Expected: (2100, 53973)
+processed_ds['freeboard'].load().values.shape: (2100, 53973)  # Expected: (2100, 53973)
+processed_ds['cell_mask'].values.shape: (465044,)  # Expected: (465044,)
+evaluated full_to_masked shape: 53973  # Expected: (53973,)
+evaluated masked_to_full shape: 53973  # Expected: (53973,)
+processed_ds['num_raw_files'].item(): 2100  # Expected: 2100
+LAST PATCH SIZE:  256
+Contains a -1 index  False
+Cluster sizes:
+min size 256
+max size 256
+smallest count (np.int64(0), 256)
+max count (np.int64(205), 256)
+number of patches: 210
+Elapsed time for MonthlyOrDailyNetCDFDataset __init__: 2.2803650200366974 seconds
+========== SPLITTING THE DATASET ===================
+Training data length:    1933
+Validation data length:  49
+Testing data length:     49
+Total Time Steps =  2031
+Number of training batches 120
+Number of validation batches 3
+Number of test batches after drop_last incomplete batch 3
+===== Printing Dataset ===== 
+<Monthly_fd_nF_data.zarr
+Instance of MonthlyOrDailyNetCDFDataset
+2077 viable time steps (only includes up to the last possible input date)
+53973 cells/time_step
+2100 files loaded 
+2100 ice_area length
+2100 freeboard length
+Patchify Algorithm: latlon_spillover
+ # The following should be (2100, 53973) for Monthly data at a latitude_threshold of 40
+(2100, 53973) shape of ice_area
+(2100, 53973) shape of freeboard
+210 indices_per_patch_id # Should be 210>
+===== Sample at dataset[0] ===== 
+Fetched start index 0: Time=1850-01-01T00:30:00.000000000
+Fetched end   index 12: Time=1851-01-01T00:30:00.000000000
+Fetched target start index 12: Time=1851-01-01T00:30:00.000000000
+Fetched target end   index 24: Time=1852-01-01T00:30:00.000000000
+Year is 1850
+Month is 1
+Day is 1
+===== Start and End Dates for Each Set =====
+Training set start date: 1850-01-01T00:30:00.000000000
+Training set end date (cosmetic): 2012-12-01T00:30:00.000000000
+(actual last viable target day): 2012-12-01T00:30:00.000000000
+Validation set start date: 2013-01-01T00:30:00.000000000
+Validation set end date (cosmetic): 2018-12-01T00:30:00.000000000
+(actual last viable target day): 2018-12-01T00:30:00.000000000
+Testing set start date: 2019-01-01T00:30:00.000000000
+Testing set end date (cosmetic): 2024-12-01T00:30:00.000000000
+(actual last viable target day): 2024-12-01T00:30:00.000000000
+===== Starting DataLoader ====
+train_loader length: 120
+val_loader length: 3
+test_loader length: 3
+input_tensor should be of shape (context_length, num_patches, num_features, patch_size)
+actual input_tensor.shape = torch.Size([12, 210, 2, 256])
+target_tensor should be of shape (forecast_horizon, num_patches, patch_size)
+actual target_tensor.shape = torch.Size([12, 210, 256])
+SKIPPED TRAINING
+SKIPPED SAVING THE MODEL
+peSO_results/peSO_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh12_e40_LLSO_model.pth
+Calling IceForecastTransformer __init__
+Elapsed time: 0.02 seconds
+End of IceForecastTransformer __init__
+Model loaded successfully!
+Processing batch 1/3
+Processing batch 2/3
+Processing batch 3/3
+Monthly RMSE plot saved as peSO_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh12_e40_LLSO_monthly_RMSE.png
+
+--- Calculating Temporal Degradation Metrics ---
+Plot saved: peSO_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh12_e40_LLSO_SIC_temporal_degradation.png
+Elapsed time for full evaluation: 12.215357716660947 seconds
+Monthly and step RMSE degradation heatmap saved.
+
+==================================================
+       TOP 30 WORST RMSE DATES AND FORECAST STEPS
+==================================================
+RMSE       Date            Forecast Step  
+----------------------------------------
+0.3707   2023-09         12             
+0.3703   2023-09         11             
+0.3698   2023-09         10             
+0.3644   2020-09         9              
+0.3643   2020-09         10             
+0.3640   2020-09         7              
+0.3640   2020-09         12             
+0.3639   2020-09         8              
+0.3638   2020-09         6              
+0.3636   2020-09         5              
+0.3635   2020-09         11             
+0.3628   2020-09         4              
+0.3624   2020-09         3              
+0.3611   2020-09         2              
+0.3603   2020-09         1              
+0.3556   2021-09         12             
+0.3547   2021-09         1              
+0.3540   2021-09         11             
+0.3535   2021-09         2              
+0.3528   2021-09         10             
+0.3527   2021-09         6              
+0.3527   2021-09         3              
+0.3526   2021-09         5              
+0.3525   2021-09         9              
+0.3525   2021-09         7              
+0.3521   2021-09         4              
+0.3520   2021-09         8              
+0.3374   2019-09         5              
+0.3374   2019-09         6              
+0.3371   2019-09         3              
+==================================================
+
+--- Calculating Overall Distribution Metrics (JSD) ---
+
+Jensen-Shannon Distance between Actual vs. Predicted SIC for LLSO patchify  (Overall Distribution): 0.3772
+Actual vs. Predicted SIC histogram saved as peSO_Mfd_nF_D128_B16_lt40_P210_L256_T12_Fh12_e40_LLSO_SIC_xy_Overall.png
+Job finished at Wed 15 Oct 2025 02:40:03 AM PDT

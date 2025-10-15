@@ -1740,6 +1740,9 @@ if FAST_EVAL_ON:
         # Move to device and apply initial reshape as done in training
         sample_x = sample_x.to(device)
         sample_y = sample_y.to(device) # Actual target values
+        years = years.to(device)
+        months = months.to(device)
+        days = days.to(device)
 
         # Initial reshape of x for the Transformer model
         B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape
@@ -1900,6 +1903,9 @@ if SLOW_EVAL_ON:
         # Move to device and apply initial reshape as done in training
         sample_x = sample_x.to(device)
         sample_y = sample_y.to(device) # Actual target values
+        years = years.to(device)
+        months = months.to(device)
+        days = days.to(device)
 
         # Initial reshape of x for the Transformer model
         B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape
@@ -1907,7 +1913,7 @@ if SLOW_EVAL_ON:
 
         # Perform inference
         with torch.no_grad(): # Essential for inference to disable gradient calculations
-            predicted_y_patches = loaded_model(sample_x_reshaped)
+            predicted_y_patches = loaded_model(sample_x_reshaped, years, months, days)
 
         # Ensure predicted_y_patches and sample_y have the same shape for comparison
         # Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH)
@@ -2206,6 +2212,9 @@ if MAP_WITH_CARTOPY_ON:
     # Move to device and apply initial reshape as done in training
     sample_x = sample_x.to(device)
     sample_y = sample_y.to(device) # Keep sample_y for actual comparison
+    years = years.to(device)
+    months = months.to(device)
+    days = days.to(device)
     
     # Initial reshape of x for the Transformer model
     B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape

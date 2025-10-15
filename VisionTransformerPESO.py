@@ -1652,48 +1652,47 @@ else:
 
 from NC_FILE_PROCESSING.metrics_and_plots import *
 
-if EVALUATING_ON:
+import torch
+import torch.nn as nn
 
-    import torch
-    import torch.nn as nn
-    
-    if not torch.cuda.is_available():
-        raise ValueError("There is a problem with Torch not recognizing the GPUs")
+if not torch.cuda.is_available():
+    raise ValueError("There is a problem with Torch not recognizing the GPUs")
 
-    print(PATH)
+PATH = "peSO_results/" + PATH
+print(PATH)
 
-    # Instantiate the model (must have the same architecture as when it was saved)
-    # Create an identical instance of the original __init__ parameters
-    loaded_model = IceForecastTransformer()
-    
-    # Load the saved state_dict
-    # weights_only=True is good practice for safety
-    state_dict = torch.load(PATH, weights_only=True)
+# Instantiate the model (must have the same architecture as when it was saved)
+# Create an identical instance of the original __init__ parameters
+loaded_model = IceForecastTransformer()
 
-    # Create an ordered dictionary to store the keys
-    from collections import OrderedDict
-    new_state_dict = OrderedDict()
-    
-    # Loop through the state_dict and remove the "module." prefix because of the multiple GPUs used
-    for k, v in state_dict.items():
-        if k.startswith('module.'):
-            name = k[7:]  # Remove the "module." prefix
-            new_state_dict[name] = v
-        else:
-            # In case some keys don't have the prefix (though unlikely for a DataParallel model)
-            new_state_dict[k] = v
+# Load the saved state_dict
+# weights_only=True is good practice for safety
+state_dict = torch.load(PATH, weights_only=True)
 
-    # Load the modified state_dict into the model
-    loaded_model.load_state_dict(new_state_dict)
-    
-    # Set the model to evaluation mode
-    loaded_model.eval()
-    
-    # Move the model to the appropriate device (CPU or GPU)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    loaded_model.to(device)
-    
-    print("Model loaded successfully!")
+# Create an ordered dictionary to store the keys
+from collections import OrderedDict
+new_state_dict = OrderedDict()
+
+# Loop through the state_dict and remove the "module." prefix because of the multiple GPUs used
+for k, v in state_dict.items():
+    if k.startswith('module.'):
+        name = k[7:]  # Remove the "module." prefix
+        new_state_dict[name] = v
+    else:
+        # In case some keys don't have the prefix (though unlikely for a DataParallel model)
+        new_state_dict[k] = v
+
+# Load the modified state_dict into the model
+loaded_model.load_state_dict(new_state_dict)
+
+# Set the model to evaluation mode
+loaded_model.eval()
+
+# Move the model to the appropriate device (CPU or GPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+loaded_model.to(device)
+
+print("Model loaded successfully!")
 
 
 # # Metrics
@@ -1704,7 +1703,7 @@ if EVALUATING_ON:
 from scipy.stats import entropy
 
 if FAST_EVAL_ON:    
-
+   
     # Accumulators for errors
     all_abs_errors = [] # To store absolute errors for each cell in each patch
     all_mse_errors = [] # To store MSE for each cell in each patch
@@ -1721,23 +1720,28 @@ if FAST_EVAL_ON:
     print(f"DEBUG: Forecast Horizon: {FORECAST_HORIZON}")
     print(f"DEBUG: Number of batches in test_loader (with drop_last=True): {len(test_loader)} Batches")
     print("==================")
-    print(f"DEBUG: len(test_set): {len(test_set)} time steps")
-    print(f"DEBUG: len(dataset) for splitting: {len(dataset)} time steps")
+    print(f"DEBUG: len(test_set): {len(test_set)} Days")
+    print(f"DEBUG: len(dataset) for splitting: {len(dataset)} Days") # Should be 356
     print(f"DEBUG: train_end: {train_end}")
-    print(f"DEBUG: val_end: {val_end}")
-    print(f"DEBUG: range for test_set: {range(val_end, total_time_steps)}") 
-    # Should be range(302, 356) for daily and range(2027, 2058) for monthly
+    print(f"DEBUG: val_end: {val_end}") # Should be 302
+    print(f"DEBUG: range for test_set: {range(val_end, total_time_steps)}") # Should be range(302, 356)
     print("==================")
+    
+    # Iterate over the test_loader
 
     start_time_metrics = time.perf_counter()
     
-    for batch_idx, (sample_x, sample_y, 
-                    start_idx, end_idx, target_start, target_end) in enumerate(test_loader):
+    for batch_idx, (sample_x, sample_y, start_idx, end_idx, target_start, target_end, 
+                    years, months, days) in enumerate(test_loader):
+        
         print(f"Processing batch {batch_idx+1}/{len(test_loader)}")
     
         # Move to device and apply initial reshape as done in training
         sample_x = sample_x.to(device)
         sample_y = sample_y.to(device) # Actual target values
+        years = years.to(device)
+        months = months.to(device)
+        days = days.to(device)
 
         # Initial reshape of x for the Transformer model
         B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape
@@ -1745,7 +1749,7 @@ if FAST_EVAL_ON:
 
         # Perform inference
         with torch.no_grad(): # Essential for inference to disable gradient calculations
-            predicted_y_patches = loaded_model(sample_x_reshaped)
+            predicted_y_patches = loaded_model(sample_x_reshaped, years, months, days)
 
         # Ensure predicted_y_patches and sample_y have the same shape for comparison
         # Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH)
@@ -1781,7 +1785,7 @@ if FAST_EVAL_ON:
     #######
     # SIC #
     #######
-    
+
     print("\n--- Error Metrics (Averaged per Cell per Patch) ---")
     print(f"Mean Absolute Error (shape {mean_abs_error_per_cell_patch.shape}):")
     # print(mean_abs_error_per_cell_patch) # Uncomment to see the full tensor
@@ -1806,7 +1810,7 @@ if FAST_EVAL_ON:
     #######
     # SIE #
     #######
-    
+
     # --- Sea Ice Extent (SIE) Prediction with Sklearn/Seaborn ---
     print("\n--- Sea Ice Extent (SIE) Metrics (Threshold > 0.15) ---")
 
@@ -1890,13 +1894,17 @@ if SLOW_EVAL_ON:
     monthly_step_mse_data = {}
     worst_rmse_list = [] # Format: (RMSE_value, 'YYYY-MM-DD', forecast_step)
     
-    for batch_idx, (sample_x, sample_y, start_idx, end_idx, target_start, target_end) in enumerate(test_loader):
+    for batch_idx, (sample_x, sample_y, start_idx, end_idx, target_start, target_end, 
+                    years, months, days) in enumerate(test_loader):
         
         print(f"Processing batch {batch_idx+1}/{len(test_loader)}")
     
         # Move to device and apply initial reshape as done in training
         sample_x = sample_x.to(device)
         sample_y = sample_y.to(device) # Actual target values
+        years = years.to(device)
+        months = months.to(device)
+        days = days.to(device)
 
         # Initial reshape of x for the Transformer model
         B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape
@@ -1904,7 +1912,7 @@ if SLOW_EVAL_ON:
 
         # Perform inference
         with torch.no_grad(): # Essential for inference to disable gradient calculations
-            predicted_y_patches = loaded_model(sample_x_reshaped)
+            predicted_y_patches = loaded_model(sample_x_reshaped, years, months, days)
 
         # Ensure predicted_y_patches and sample_y have the same shape for comparison
         # Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH)
@@ -1931,7 +1939,6 @@ if SLOW_EVAL_ON:
             start_month = start_time_np.astype("datetime64[M]").astype(int) % 12 + 1
             start_day   = (start_time_np.astype("datetime64[D]") - start_time_np.astype("datetime64[M]")).astype(int) + 1
             
-
             # Loop through the forecast horizon to get the month for each forecast step
             for step in range(FORECAST_HORIZON):
 
@@ -2187,67 +2194,66 @@ if SLOW_EVAL_ON:
 # In[29]:
 
 
-
-    if MAP_WITH_CARTOPY_ON:
-        # Load one batch
-        data_iter = iter(test_loader)
-        sample_x, sample_y, start_idx, end_idx, target_start, target_end, years, months, days = next(data_iter)
-        
-        print(f"Shape of sample_x {sample_x.shape}")
-        print(f"Shape of sample_y {sample_y.shape}")   
-        
-        print(f"Fetched sample_x start index {start_idx}: Time={dataset.times[start_idx]}")
-        print(f"Fetched sample_x end   index {end_idx}:   Time={dataset.times[end_idx]}")
-        
-        print(f"Fetched sample_y (target) start index {target_end}: Time={dataset.times[target_end]}")
-        print(f"Fetched sample_y (target) end   index {target_end}: Time={dataset.times[target_end]}")
-        
-        # Move to device and apply initial reshape as done in training
-        sample_x = sample_x.to(device)
-        sample_y = sample_y.to(device) # Keep sample_y for actual comparison
-        
-        # Initial reshape of x for the Transformer model
-        B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape
-        sample_x_reshaped = sample_x.view(B_sample, T_sample, P_sample, C_sample * L_sample)
-        
-        print(f"Sample x for inference shape (reshaped): {sample_x_reshaped.shape}")
-        
-        # Perform inference
-        with torch.no_grad(): # Essential for inference to disable gradient calculations
-            predicted_y_patches = loaded_model(sample_x_reshaped, years, months, days)
-        
-        print(f"Predicted y patches shape: {predicted_y_patches.shape}")
-        print(f"Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH) ex., (16, {loaded_model.forecast_horizon}, 140, 256)")
-                         
-        # Option 1: Select a specific day from the forecast horizon (ex., the first day)
-        # This is the shape (B, NUM_PATCHES, CELLS_PER_PATCH) for that specific day.
-        predicted_for_day_0 = predicted_y_patches[:, 0, :, :].cpu()
-        print(f"Predicted ice area for Day 0 (specific day) shape: {predicted_for_day_0.shape}")
-        
-        # Ensure sample_y has the same structure
-        actual_for_day_0 = sample_y[:, 0, :, :].cpu()
-        print(f"Actual ice area for Day 0 (specific day) shape: {actual_for_day_0.shape}")
-        
-        # Save predictions so that I can use cartopy by switching kernels for the next jupyter cell
-        np.save(f'patches/ice_area_patches_predicted_{PATH}_day0.npy', predicted_for_day_0)
-        np.save(f'patches/ice_area_patches_actual_{PATH}_day0.npy', actual_for_day_0)
+if MAP_WITH_CARTOPY_ON:
+    # Load one batch
+    data_iter = iter(test_loader)
+    sample_x, sample_y, start_idx, end_idx, target_start, target_end, years, months, days = next(data_iter)
     
-        # Option 2: Iterate through all forecast days
-        all_predicted_ice_areas = []
-        all_actual_ice_areas = []
-        
-        for time_step_idx in range(loaded_model.forecast_horizon):
-            predicted_day = predicted_y_patches[:, time_step_idx, :, :].cpu()
-            all_predicted_ice_areas.append(predicted_day)
-        
-            actual_day = sample_y[:, time_step_idx, :, :].cpu()
-            all_actual_ice_areas.append(actual_day)
-        
-            print(f"Processing forecast day {time_step_idx}: Predicted shape {predicted_day.shape}, Actual shape {actual_day.shape}")
-        
-            # Save each day's prediction/actual data if needed
-            # np.save(f'patches/ice_area_patches_predicted_day{time_step_idx}.npy', predicted_day)
-            # np.save(f'patches/ice_area_patches_actual_day{time_step_idx}.npy', actual_day)
+    print(f"Shape of sample_x {sample_x.shape}")
+    print(f"Shape of sample_y {sample_y.shape}")   
+    
+    print(f"Fetched sample_x start index {start_idx}: Time={dataset.times[start_idx]}")
+    print(f"Fetched sample_x end   index {end_idx}:   Time={dataset.times[end_idx]}")
+    
+    print(f"Fetched sample_y (target) start index {target_end}: Time={dataset.times[target_end]}")
+    print(f"Fetched sample_y (target) end   index {target_end}: Time={dataset.times[target_end]}")
+    
+    # Move to device and apply initial reshape as done in training
+    sample_x = sample_x.to(device)
+    sample_y = sample_y.to(device) # Keep sample_y for actual comparison
+    
+    # Initial reshape of x for the Transformer model
+    B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape
+    sample_x_reshaped = sample_x.view(B_sample, T_sample, P_sample, C_sample * L_sample)
+    
+    print(f"Sample x for inference shape (reshaped): {sample_x_reshaped.shape}")
+    
+    # Perform inference
+    with torch.no_grad(): # Essential for inference to disable gradient calculations
+        predicted_y_patches = loaded_model(sample_x_reshaped, years, months, days)
+    
+    print(f"Predicted y patches shape: {predicted_y_patches.shape}")
+    print(f"Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH) ex., (16, {loaded_model.forecast_horizon}, 140, 256)")
+                     
+    # Option 1: Select a specific day from the forecast horizon (ex., the first day)
+    # This is the shape (B, NUM_PATCHES, CELLS_PER_PATCH) for that specific day.
+    predicted_for_day_0 = predicted_y_patches[:, 0, :, :].cpu()
+    print(f"Predicted ice area for Day 0 (specific day) shape: {predicted_for_day_0.shape}")
+    
+    # Ensure sample_y has the same structure
+    actual_for_day_0 = sample_y[:, 0, :, :].cpu()
+    print(f"Actual ice area for Day 0 (specific day) shape: {actual_for_day_0.shape}")
+    
+    # Save predictions so that I can use cartopy by switching kernels for the next jupyter cell
+    np.save(f'patches/ice_area_patches_predicted_{PATH}_day0.npy', predicted_for_day_0)
+    np.save(f'patches/ice_area_patches_actual_{PATH}_day0.npy', actual_for_day_0)
+
+    # Option 2: Iterate through all forecast days
+    all_predicted_ice_areas = []
+    all_actual_ice_areas = []
+    
+    for time_step_idx in range(loaded_model.forecast_horizon):
+        predicted_day = predicted_y_patches[:, time_step_idx, :, :].cpu()
+        all_predicted_ice_areas.append(predicted_day)
+    
+        actual_day = sample_y[:, time_step_idx, :, :].cpu()
+        all_actual_ice_areas.append(actual_day)
+    
+        print(f"Processing forecast day {time_step_idx}: Predicted shape {predicted_day.shape}, Actual shape {actual_day.shape}")
+    
+        # Save each day's prediction/actual data if needed
+        # np.save(f'patches/ice_area_patches_predicted_day{time_step_idx}.npy', predicted_day)
+        # np.save(f'patches/ice_area_patches_actual_day{time_step_idx}.npy', actual_day)
 
 
 # # Recover nCells from Patches for Visualization
