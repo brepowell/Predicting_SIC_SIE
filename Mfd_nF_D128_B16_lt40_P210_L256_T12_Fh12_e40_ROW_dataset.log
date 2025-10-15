@@ -19,9 +19,9 @@ INFO:root:cell_mask.shape = (465044,)
 INFO:root:evaluated full_to_masked shape = ()
 INFO:root:evaluated masked_to_full shape = ()
 INFO:root:num_raw_files = 2100
-INFO:root:Loaded pre-processed data from Zarr in 1.82 seconds.
+INFO:root:Loaded pre-processed data from Zarr in 1.78 seconds.
 INFO:root:=== Patchifying using rows algorithm ===
-INFO:root:Patchifying completed in 0.34 seconds.
+INFO:root:Patchifying completed in 0.39 seconds.
 INFO:root:Total time steps collected (days or months): 2100
 INFO:root:Unique times: 2100
 INFO:root:First 35 time values: ['1850-01-01T00:30:00.000000000' '1850-02-01T00:30:00.000000000'
@@ -62,7 +62,7 @@ INFO:root:Last 35 time values: ['2022-02-01T00:30:00.000000000' '2022-03-01T00:3
  '2024-12-01T00:30:00.000000000']
 INFO:root:Shape of combined ice_area array: (2100, 53973)
 INFO:root:Shape of combined freeboard array: (2100, 53973)
-INFO:root:Elapsed time for MonthlyOrDailyNetCDFDataset __init__: 2.1647927379235625 seconds
+INFO:root:Elapsed time for MonthlyOrDailyNetCDFDataset __init__: 2.1689922022633255 seconds
 INFO:root:Training set start date: 1850-01-01T00:30:00.000000000
 INFO:root:Training set end date (cosmetic): 2012-12-01T00:30:00.000000000)
 INFO:root:(actual last viable target day): 2012-12-01T00:30:00.000000000

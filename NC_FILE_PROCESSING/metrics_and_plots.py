@@ -461,425 +461,23 @@ def get_predicted_actual_arrays(ds: xr.Dataset):
     actual = ds['actual'].values.flatten()
     return predicted, actual
 
-
-########
-# SIC  #
-########
-
-def plot_SIC_temporal_degradation(ds: xr.Dataset, model_version: str, patching_strategy_abbr: str):
-    """
-    Plots MAE and RMSE degradation over the forecast horizon for SIC using an xarray Dataset.
-    Assumes 'predicted', 'actual', and 'forecast_step' are in the dataset.
-    
-    Parameters
-    ----------
-    ds : xr.Dataset
-        Dataset containing 'predicted', 'actual', and 'forecast_step' coordinates/variables.
-    model_version : str
-        The version/name of the model for saving files.
-    patching_strategy_abbr : str
-        The patching strategy abbreviation for plot titles/filenames.
-    
-    """
-    print("--- Calculating Temporal Degradation Metrics ---")
-
-    # Group by 'forecast_step' coordinate to compute metrics for each forecast day
-    grouped = ds.groupby('forecast_step')
-
-    mae_per_step = []
-    rmse_per_step = []
-    forecast_steps = sorted(ds['forecast_step'].values.tolist())
-
-    for step in forecast_steps:
-        subset = grouped[step]
-        
-        # Access data and compute metrics
-        predicted_flat = subset['predicted'].values.flatten()
-        actual_flat = subset['actual'].values.flatten()
-        
-        mae = mean_absolute_error(actual_flat, predicted_flat)
-        mse = mean_squared_error(actual_flat, predicted_flat)
-        rmse = np.sqrt(mse)
-        
-        mae_per_step.append(mae)
-        rmse_per_step.append(rmse)
-
-    # --- Plot Degradation Curve (MAE and RMSE vs. Forecast Step) ---
-    fig, ax1 = plt.subplots(figsize=(12, 6))
-    
-    color = 'tab:red'
-    ax1.set_xlabel('Forecast Horizon (Days)')
-    ax1.set_ylabel('MAE', color=color)
-    ax1.plot(forecast_steps, mae_per_step, color=color, marker='o', label='MAE')
-    ax1.tick_params(axis='y', labelcolor=color)
-    ax1.set_xticks(forecast_steps)
-    ax1.grid(True, linestyle='--', alpha=0.6)
-
-    ax2 = ax1.twinx()
-    color = 'tab:blue'
-    ax2.set_ylabel('RMSE', color=color)
-    ax2.plot(forecast_steps, rmse_per_step, color=color, marker='x', linestyle='--', label='RMSE')
-    ax2.tick_params(axis='y', labelcolor=color)
-
-    ax1.set_title(f'SIC Temporal Degradation Per Day ({model_version}, {patching_strategy_abbr})')
-    fig.legend(loc="upper right", bbox_to_anchor=(1, 1), bbox_transform=ax1.transAxes)
-    plt.tight_layout()
-    plt.savefig(f'{model_version}_{patching_strategy_abbr}_SIC_temporal_degradation_by_day.png')
-    plt.close()
-    print(f"Plot saved: {model_version}_{patching_strategy_abbr}_SIC_temporal_degradation_by_day.png")
-
-    # --- Optional: Analyze Degradation by Month or Year ---
-    # NOTE: This part is tricky with xarray and often requires a Dask-backed dataset for full performance.
-    # We will do it with pandas for now for simplicity, but a pure xarray solution is better for scale.
-    # The `ds.to_dataframe()` call here is a potential bottleneck on a very large dataset.
-    df = ds.to_dataframe()
-    df['month'] = df.index.get_level_values('date').month
-    df['year'] = df.index.get_level_values('date').year
-
-    # Calculate metrics by month and forecast step
-    degradation_by_month = df.groupby(['month', 'forecast_step']).agg(
-        MAE=('abs_error', 'mean') # Note: 'abs_error' needs to be calculated first
-    ).reset_index()
-
-    # Plot a heatmap of MAE by month and forecast step
-    fig, ax = plt.subplots(figsize=(12, 8))
-    heatmap_data = degradation_by_month.pivot(index='month', columns='forecast_step', values='MAE')
-    sns.heatmap(heatmap_data, cmap='viridis', ax=ax, cbar_kws={'label': 'MAE'})
-    ax.set_title(f"MAE Degradation by Month and Forecast Horizon for {patching_strategy_abbr}")
-    ax.set_xlabel("Forecast Horizon (Days)")
-    ax.set_ylabel("Month")
-    plt.tight_layout()
-    plt.savefig(f"{model_version}_monthly_degradation.png")
-    plt.close()
-    print(f"Monthly degradation heatmap saved.") 
-
-########
-# SIE  #
-########
-
-def calculate_full_sie_in_kilometers(sic_array: np.ndarray, cell_area: [float, np.ndarray] = 25 * 25):
-    """
-    Calculates the Sea Ice Extent (SIE) from a 2D Sea Ice Concentration (SIC) array.
-    
-    Parameters
-    ----------
-    sic_array : np.ndarray
-        A 2D array of Sea Ice Concentration values (0-1).
-    cell_area : float or np.ndarray
-        The area of a single grid cell in square kilometers. Can be a float (if all cells
-        are the same size) or a NumPy array (if cell areas vary per grid cell).
-        Default is 25x25 km.
-    
-    Returns
-    -------
-    float
-        The total Sea Ice Extent in square kilometers.
-    """
-    # Create a boolean mask for ice (SIC >= 15%)
-    ice_mask = (sic_array >= 0.15)
-    
-    if isinstance(cell_area, (int, float)):
-        # If cell_area is a single value, multiply the count of ice cells by this area
-        sie_area = np.sum(ice_mask) * cell_area
-    elif isinstance(cell_area, np.ndarray):
-        # If cell_area is an array, perform element-wise multiplication with the mask
-        # and then sum the areas of the ice cells
-        if ice_mask.shape != cell_area.shape:
-            raise ValueError(f"Shape mismatch: sic_array mask {ice_mask.shape} and cell_area array {cell_area.shape} must be the same.")
-        sie_area = np.sum(ice_mask * cell_area)
-    else:
-        raise TypeError("cell_area must be a float, int, or numpy.ndarray.")
-        
-    return sie_area
-
-
-def plot_SIE_Kilometers_degradation(ds_sie: xr.Dataset, model_version: str, patching_strategy_abbr: str):
-    """
-    Calculates and plots error metrics (MAE, RMSE) for SIE as a function of
-    forecast horizon.
-    """
-    if 'predicted_sie_km' not in ds_sie or ds_sie['predicted_sie_km'].size == 0:
-        logging.warning("No SIE data provided for temporal degradation analysis.")
-        return
-
-    print("--- Calculating SIE Temporal Degradation Metrics ---")
-    
-    # Calculate absolute and squared errors
-    abs_error = np.abs(ds_sie['predicted_sie_km'] - ds_sie['actual_sie_km'])
-    squared_error = (ds_sie['predicted_sie_km'] - ds_sie['actual_sie_km'])**2
-
-    # Group by forecast step and compute mean of errors
-    mae_by_step = abs_error.groupby('forecast_step').mean()
-    rmse_by_step = np.sqrt(squared_error.groupby('forecast_step').mean())
-    
-    forecast_steps = mae_by_step['forecast_step'].values
-    
-    fig, ax = plt.subplots(figsize=(12, 6))
-    
-    ax.plot(forecast_steps, mae_by_step.values, label='MAE', marker='o')
-    ax.plot(forecast_steps, rmse_by_step.values, label='RMSE', marker='x')
-    
-    ax.set_title(f"SIE Error Degradation over Forecast Horizon for {patching_strategy_abbr}")
-    ax.set_xlabel("Forecast Horizon (Days)")
-    ax.set_ylabel("Error (km²)")
-    ax.legend()
-    ax.grid(True)
-    
-    plot_filename = f"{model_version}_sie_KM_temporal_degradation.png"
-    plt.tight_layout()
-    plt.savefig(plot_filename)
-    plt.close()
-    print(f"SIE temporal degradation plot saved as {model_version}_sie_KM_temporal_degradation.png")
-
-
-
-def plot_SIE_f1_score_degradation(ds_sic: xr.Dataset, model_version: str, patching_strategy_abbr: str, threshold: float = 0.15):
-    """
-    Calculates and plots the F1-score for sea ice classification as a function of
-    the forecast horizon.
-    
-    Parameters
-    ----------
-    ds_sic : xr.Dataset
-        Dataset containing 'predicted' and 'actual' SIC values.
-    model_version : str
-        The version/name of the model for saving files.
-    patching_strategy_abbr : str
-        The patching strategy abbreviation for plot titles/filenames.
-    threshold : float
-        The SIC threshold (e.15 for 15%) to classify a pixel as "ice".
-    """
-    if 'predicted' not in ds_sic or ds_sic['predicted'].size == 0:
-        logging.warning("No data provided for F1-score degradation analysis.")
-        return
-
-    print("--- Calculating F1-Score Degradation Metrics ---")
-    
-    # Classify each pixel based on the threshold
-    actual_class = np.where(ds_sic['actual'].values > threshold, 1, 0)
-    predicted_class = np.where(ds_sic['predicted'].values > threshold, 1, 0)
-
-    # Use xarray's groupby to iterate over forecast steps
-    f1_scores = []
-    forecast_steps = sorted(ds_sic['forecast_step'].values.tolist())
-    
-    for step in forecast_steps:
-        # Get the indices for the current forecast step
-        indices = np.where(ds_sic['forecast_step'].values == step)[0]
-        
-        # Calculate F1-score for this subset of the data
-        f1 = f1_score(actual_class[indices], predicted_class[indices], zero_division=0)
-        f1_scores.append(f1)
-
-    # --- Plot the F1-score Degradation Curve ---
-    fig, ax = plt.subplots(figsize=(12, 6))
-    
-    ax.plot(forecast_steps, f1_scores, label='F1-Score', marker='o', color='forestgreen')
-    
-    ax.set_title(f"F1-Score Degradation over Forecast Horizon ({threshold*100:.0f}% threshold {patching_strategy_abbr})")
-    ax.set_xlabel("Forecast Horizon (Days)")
-    ax.set_ylabel("F1-Score")
-    ax.legend()
-    ax.grid(True)
-    
-    plot_filename = f"{model_version}_f1_score_degradation.png"
-    plt.tight_layout()
-    plt.savefig(plot_filename)
-    plt.close()
-    print(f"F1-score degradation plot saved as {model_version}_f1_score_degradation.png")
-
-
-def calculate_and_log_spatial_errors(ds: xr.Dataset, title_suffix: str):
-    """
-    Calculates and logs overall spatial error metrics (MAE, MSE, RMSE) from an xarray Dataset.
-    Assumes 'predicted' and 'actual' are data variables in the dataset.
-
-    Parameters
-    ----------
-    ds : xr.Dataset
-        Dataset containing 'predicted' and 'actual' values.
-    model_version : str
-        The version/name of the model.
-    title_suffix : str, optional
-        Additional text to append to the title for flexibility (e.g., " (Day 5)").
-    """
-    print(f"\n--- Error Metrics (Averaged per Cell per Patch{title_suffix}) ---")
-    
-    # Use the helper function
-    predicted_flat, actual_flat = get_predicted_actual_arrays(ds)
-    
-    mae = mean_absolute_error(actual_flat, predicted_flat)
-    mse = mean_squared_error(actual_flat, predicted_flat)
-    rmse = np.sqrt(mse)
-
-    print(f"Overall SIC MAE {title_suffix}: {mae:.4f}")
-    print(f"Overall SIC MSE {title_suffix}: {mse:.4f}")
-    print(f"Overall SIC RMSE {title_suffix}: {rmse:.4f}")
-
-
-
-def log_classification_report(ds: xr.Dataset, threshold: float = 0.15, title_suffix: str = ""):
-    """
-    Applies a threshold to SIC values and logs the classification report.
-    
-    Parameters
-    ----------
-    ds : xr.Dataset
-        Dataset containing 'predicted' and 'actual' values.
-    threshold : float
-        The SIC threshold (e.g., 0.15) to classify a pixel as "ice".
-    title_suffix : str
-        Additional text for the title of the log output.
-    """
-    print(f"\n--- Sea Ice Extent (SIE) Metrics (Threshold > {threshold}){title_suffix} ---")
-    
-    # Use the helper function
-    predicted_flat, actual_flat = get_predicted_actual_arrays(ds)
-
-    sie_actual_flat = np.where(actual_flat > threshold, 1, 0)
-    sie_predicted_flat = np.where(predicted_flat > threshold, 1, 0)
-
-    print("\nClassification Report:")
-    report = classification_report(sie_actual_flat, sie_predicted_flat, target_names=['No Ice', 'Ice'], zero_division=0)
-    print(report)
-
-
-def plot_sie_confusion_matrix(ds_sic_temporal: xr.Dataset, threshold: float, model_version: str, patching_strategy_abbr: str, forecast_day: int = None):
-    """
-    Calculates and plots the confusion matrix for SIE classification with percentages.
-    Can plot for overall data or a specific forecast day.
-
-    Parameters
-    ----------
-    ds_sic_temporal : xr.Dataset
-        Dataset containing 'predicted', 'actual', and 'forecast_step' coordinates.
-    threshold : float
-        The SIC threshold (e.g., 0.15) to classify a pixel as "ice".
-    model_version : str
-        The version/name of the model for saving files.
-    patching_strategy_abbr : str
-        The patching strategy abbreviation for plot titles/filenames.
-    forecast_day : int, optional
-        If provided, plots the confusion matrix for this specific forecast day.
-        Otherwise, uses all data (overall performance).
-    """
-    plot_suffix = ""
-    ds_filtered = ds_sic_temporal.copy()
-
-    if forecast_day is not None:
-        if forecast_day in ds_sic_temporal['forecast_step']:
-            ds_filtered = ds_sic_temporal.sel(forecast_step=forecast_day, drop=True)
-            plot_suffix = f" (Day {forecast_day})"
-        else:
-            logging.warning(f"No data for confusion matrix for forecast day {forecast_day}.")
-            return
-    else:
-        plot_suffix = " (Overall)"
-    
-    if ds_filtered['predicted'].size == 0:
-        logging.warning(f"No data for confusion matrix for forecast day {forecast_day if forecast_day is not None else 'overall'}.")
-        return
-
-    predicted_flat, actual_flat = get_predicted_actual_arrays(ds_filtered)
-
-    sie_actual_flat = np.where(actual_flat > threshold, 1, 0)
-    sie_predicted_flat = np.where(predicted_flat > threshold, 1, 0)
-
-    cm = confusion_matrix(sie_actual_flat, sie_predicted_flat)
-    cm_percent = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-    annot_labels = np.array([
-        [f"{cm[0, 0]:,}\n({cm_percent[0, 0]:.2%})", f"{cm[0, 1]:,}\n({cm_percent[0, 1]:.2%})"],
-        [f"{cm[1, 0]:,}\n({cm_percent[1, 0]:.2%})", f"{cm[1, 1]:,}\n({cm_percent[1, 1]:.2%})"]
-    ])
-    fig, ax = plt.subplots(figsize=(10, 8))
-    sns.heatmap(cm, annot=annot_labels, fmt='', cmap='Blues', xticklabels=['No Ice', 'Ice'], yticklabels=['No Ice', 'Ice'], ax=ax)
-    ax.set_title(f'Sea Ice Extent Confusion Matrix (Threshold > {threshold}){plot_suffix} for {patching_strategy_abbr}', fontsize=16)
-    ax.set_ylabel('True Label')
-    ax.set_xlabel('Predicted Label')
-    plt.tight_layout()
-    
-    filename_suffix = f"_Day{forecast_day}" if forecast_day is not None else "_Overall"
-    plt.savefig(f"{model_version}_SIE_Confusion_Matrix{filename_suffix}.png")
-    plt.close()
-    print(f"Confusion matrix plot saved as {model_version}_SIE_Confusion_Matrix{filename_suffix}.png")
-
-
-def plot_roc_curve(ds_sic_temporal: xr.Dataset, model_version: str, patching_strategy_abbr: str, threshold: float = 0.15, forecast_day: int = None):
-    """
-    Calculates and plots the ROC curve and AUC score.
-    Can plot for overall data or a specific forecast day.
-
-    Parameters
-    ----------
-    ds_sic_temporal : xr.Dataset
-        Dataset containing 'predicted', 'actual', and 'forecast_step' coordinates.
-    model_version : str
-        The version/name of the model for saving files.
-    patching_strategy_abbr : str
-        The patching strategy abbreviation for plot titles/filenames.
-    threshold : float
-        The SIC threshold (e.g., 0.15) used for binary classification.
-    forecast_day : int, optional
-        If provided, plots the ROC curve for this specific forecast day.
-        Otherwise, uses all data (overall performance).
-    """
-    plot_suffix = ""
-    ds_filtered = ds_sic_temporal.copy()
-
-    if forecast_day is not None:
-        if forecast_day in ds_sic_temporal['forecast_step']:
-            ds_filtered = ds_sic_temporal.sel(forecast_step=forecast_day, drop=True)
-            plot_suffix = f" (Day {forecast_day})"
-        else:
-            logging.warning(f"No data for ROC curve for forecast day {forecast_day}.")
-            return
-    else:
-        plot_suffix = " (Overall)"
-
-    if ds_filtered['predicted'].size == 0:
-        logging.warning(f"No data for ROC curve for forecast day {forecast_day if forecast_day is not None else 'overall'}.")
-        return
-
-    print(f"\n--- ROC Curve and AUC Metrics {plot_suffix} ---")
-    
-    predicted_flat, actual_flat = get_predicted_actual_arrays(ds_filtered)
-
-    y_true_binary = np.where(actual_flat > threshold, 1, 0)
-    y_scores = predicted_flat
-
-    # Calculate ROC curve data
-    fpr, tpr, thresholds_roc = roc_curve(y_true_binary, y_scores)
-
-    # Calculate AUC score
-    auc = roc_auc_score(y_true_binary, y_scores)
-    
-    plt.figure(figsize=(8, 8))
-    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (AUC = {auc:.4f})')
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', label='Random guess')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate (FPR)')
-    plt.ylabel('True Positive Rate (TPR)')
-    plt.title(f'Receiver Operating Characteristic (ROC) Curve{plot_suffix} {patching_strategy_abbr}')
-    plt.legend(loc="lower right")
-    plt.grid(True)
-    
-    filename_suffix = f"_Day{forecast_day}" if forecast_day is not None else "_Overall"
-    plt.savefig(f"{model_version}_ROC_Curve{filename_suffix}.png")
-    plt.close()
-    
-    print(f"\nArea Under the Curve (AUC): {auc:.4f}")
-    print(f"ROC curve plot saved as {model_version}_ROC_Curve{filename_suffix}.png")
-
-
-def plot_actual_vs_predicted_sic_distribution(ds_sic: xr.Dataset, model_version: str, patching_strategy_abbr: str, num_bins: int = 50, title_suffix: str = ""):
+def plot_actual_vs_predicted_sic_distribution(
+    predicted_flat: np.ndarray, 
+    actual_flat: np.ndarray, 
+    model_version: str, 
+    patching_strategy_abbr: str, 
+    num_bins: int = 50, 
+    title_suffix: str = ""
+):
     """
     Plots overlapping histograms of actual vs. predicted SIC values and calculates JSD.
 
     Parameters
     ----------
-    ds_sic : xr.Dataset
-        Dataset containing 'predicted' and 'actual' values.
+    predicted_flat : np.ndarray
+        1D array of all predicted Sea Ice Concentration values.
+    actual_flat : np.ndarray
+        1D array of all actual Sea Ice Concentration values.
     model_version : str
         The version/name of the model for saving files.
     patching_strategy_abbr : str
@@ -887,15 +485,15 @@ def plot_actual_vs_predicted_sic_distribution(ds_sic: xr.Dataset, model_version:
     num_bins : int
         Number of bins for the histograms.
     title_suffix : str, optional
-        Additional text to append to the title for flexibility (e.g., " (Day 5)").
+        Additional text to append to the title.
     """
-    predicted_flat, actual_flat = get_predicted_actual_arrays(ds_sic)
 
     bins = np.linspace(0, 1, num_bins + 1)
     hist_predicted, _ = np.histogram(predicted_flat, bins=bins, density=True)
     hist_actual, _ = np.histogram(actual_flat, bins=bins, density=True)
 
-    # Normalize histograms to sum to 1
+    # Normalize histograms to sum to 1 (Required for JSD to work correctly with probabilities)
+    # The sum might be close to 1 due to density=True, but explicit normalization is safer.
     hist_predicted = hist_predicted / hist_predicted.sum()
     hist_actual = hist_actual / hist_actual.sum()
 
@@ -906,12 +504,12 @@ def plot_actual_vs_predicted_sic_distribution(ds_sic: xr.Dataset, model_version:
     plt.figure(figsize=(10, 6))
     plt.hist(actual_flat, bins=bins, alpha=0.7, label='Actual Data', color='skyblue', density=True)
     plt.hist(predicted_flat, bins=bins, alpha=0.7, label='Predicted Data', color='salmon', density=True)
-    plt.title(f'Actual vs. Predicted SIC for {patching_strategy_abbr} Patchify{title_suffix}')
+    plt.title(f'Actual vs. Predicted SIC for {patching_strategy_abbr} Patchify{title_suffix}\nJSD: {jsd:.4f}')
     plt.xlabel('Ice Concentration Value')
     plt.ylabel('Probability Density')
     plt.legend()
     plt.grid(axis='y', alpha=0.75)
-    
+        
     filename_suffix = ""
     if "overall" in title_suffix.lower():
         filename_suffix = "_Overall"

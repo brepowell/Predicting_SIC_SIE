@@ -87,12 +87,14 @@ PATCHIFY_ABBREVIATIONS = {
 
 # In[7]:
 
+
+# --- Run Settings:
 MONTHLY =                      True
 TRIAL_RUN =                    False   # SET THIS TO USE THE PRACTICE SET (MUCH FASTER AND SMALLER, for debugging)
 NORMALIZE_ON =                 False   # SET THIS TO USE NORMALIZATION ON FREEBOARD (Results are independent of patchify used)
-TRAINING =                     True    # SET THIS TO RUN THE TRAINING LOOP (Use on full dataset for results)
-EVALUATING_ON =                True    # SET THIS TO RUN THE METRICS AT THE BOTTOM (Use on full dataset for results)
-PLOT_DAY_BY_DAY_METRICS =      False   # See a comparison of metrics per forecast day
+TRAINING =                     False    # SET THIS TO RUN THE TRAINING LOOP (Use on full dataset for results)
+FAST_EVAL_ON =                 False    # SET THIS TO RUN THE METRICS AT THE BOTTOM (Use on full dataset for results)
+SLOW_EVAL_ON =                 True
 MAP_WITH_CARTOPY_ON =          False   # Make sure the Cartopy library is included in the kernel
 
 # Only run ONCE for daily and once for monthly!!
@@ -1701,7 +1703,7 @@ if EVALUATING_ON:
 
 from scipy.stats import entropy
 
-if EVALUATING_ON:    
+if FAST_EVAL_ON:    
 
     # Accumulators for errors
     all_abs_errors = [] # To store absolute errors for each cell in each patch
@@ -1719,20 +1721,18 @@ if EVALUATING_ON:
     print(f"DEBUG: Forecast Horizon: {FORECAST_HORIZON}")
     print(f"DEBUG: Number of batches in test_loader (with drop_last=True): {len(test_loader)} Batches")
     print("==================")
-    print(f"DEBUG: len(test_set): {len(test_set)} Days")
-    print(f"DEBUG: len(dataset) for splitting: {len(dataset)} Days") # Should be 356
+    print(f"DEBUG: len(test_set): {len(test_set)} time steps")
+    print(f"DEBUG: len(dataset) for splitting: {len(dataset)} time steps")
     print(f"DEBUG: train_end: {train_end}")
-    print(f"DEBUG: val_end: {val_end}") # Should be 302
-    print(f"DEBUG: range for test_set: {range(val_end, total_time_steps)}") # Should be range(302, 356)
+    print(f"DEBUG: val_end: {val_end}")
+    print(f"DEBUG: range for test_set: {range(val_end, total_time_steps)}") 
+    # Should be range(302, 356) for daily and range(2027, 2058) for monthly
     print("==================")
-    
-    # Iterate over the test_loader
 
     start_time_metrics = time.perf_counter()
     
-    for batch_idx, (sample_x, sample_y, start_idx, end_idx, target_start, target_end, 
-                    years, months, days) in enumerate(test_loader):
-        
+    for batch_idx, (sample_x, sample_y, 
+                    start_idx, end_idx, target_start, target_end) in enumerate(test_loader):
         print(f"Processing batch {batch_idx+1}/{len(test_loader)}")
     
         # Move to device and apply initial reshape as done in training
@@ -1745,7 +1745,7 @@ if EVALUATING_ON:
 
         # Perform inference
         with torch.no_grad(): # Essential for inference to disable gradient calculations
-            predicted_y_patches = loaded_model(sample_x_reshaped, years, months, days)
+            predicted_y_patches = loaded_model(sample_x_reshaped)
 
         # Ensure predicted_y_patches and sample_y have the same shape for comparison
         # Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH)
@@ -1778,6 +1778,10 @@ if EVALUATING_ON:
         final_predicted_values = np.concatenate(all_predicted_values_flat)
         final_actual_values = np.concatenate(all_actual_values_flat)
 
+    #######
+    # SIC #
+    #######
+    
     print("\n--- Error Metrics (Averaged per Cell per Patch) ---")
     print(f"Mean Absolute Error (shape {mean_abs_error_per_cell_patch.shape}):")
     # print(mean_abs_error_per_cell_patch) # Uncomment to see the full tensor
@@ -1799,6 +1803,10 @@ if EVALUATING_ON:
     print(f"Mean ABS Error array saved as {model_version}_MAE_per_cell_patch.npy")
     print(f"Mean MSE Error array saved as {model_version}_MSE_per_cell_patch.npy")
 
+    #######
+    # SIE #
+    #######
+    
     # --- Sea Ice Extent (SIE) Prediction with Sklearn/Seaborn ---
     print("\n--- Sea Ice Extent (SIE) Metrics (Threshold > 0.15) ---")
 
@@ -1863,12 +1871,323 @@ if EVALUATING_ON:
     print(f"Elapsed time for metrics: {time.perf_counter() - start_time_metrics} seconds")
 
 
+# In[ ]:
+
+
+from NC_FILE_PROCESSING.metrics_and_plots import *
+if SLOW_EVAL_ON:
+
+    start_full_evaluation = time.perf_counter()
+    
+    # Create lists to store errors with month metadata
+    all_predicted_values = []
+    all_actual_values = []
+    all_abs_errors_with_month = []
+    all_mse_errors_with_month = []
+    all_predicted_values_with_month = []
+    all_actual_values_with_month = []
+    mse_per_step = {step: [] for step in range(1, FORECAST_HORIZON + 1)}
+    monthly_step_mse_data = {}
+    worst_rmse_list = [] # Format: (RMSE_value, 'YYYY-MM-DD', forecast_step)
+    
+    for batch_idx, (sample_x, sample_y, start_idx, end_idx, target_start, target_end) in enumerate(test_loader):
+        
+        print(f"Processing batch {batch_idx+1}/{len(test_loader)}")
+    
+        # Move to device and apply initial reshape as done in training
+        sample_x = sample_x.to(device)
+        sample_y = sample_y.to(device) # Actual target values
+
+        # Initial reshape of x for the Transformer model
+        B_sample, T_sample, P_sample, C_sample, L_sample = sample_x.shape
+        sample_x_reshaped = sample_x.view(B_sample, T_sample, P_sample, C_sample * L_sample)
+
+        # Perform inference
+        with torch.no_grad(): # Essential for inference to disable gradient calculations
+            predicted_y_patches = loaded_model(sample_x_reshaped)
+
+        # Ensure predicted_y_patches and sample_y have the same shape for comparison
+        # Expected shape: (B, forecast_horizon, NUM_PATCHES, CELLS_PER_PATCH)
+        if predicted_y_patches.shape != sample_y.shape:
+            print(f"Shape mismatch: Predicted {predicted_y_patches.shape}, Actual {sample_y.shape}")
+            continue # Skip this batch if shapes are incompatible
+
+        # Calculate errors for each cell in each patch, across the forecast horizon and batch
+        # The errors will implicitly be averaged over the batch when we take the mean later
+        diff = predicted_y_patches - sample_y
+        abs_error_batch = torch.abs(diff)
+        mse_error_batch = diff ** 2
+
+        # Loop through each item in the batch
+        for i in range(B_sample):
+            
+            # Get the start date for this specific sample
+            start_time_np = dataset.times[start_idx[i]]
+        
+            # Cast start_time_np to Month precision to allow addition with np.timedelta64(step, 'M')
+            start_time_month_np = start_time_np.astype('datetime64[M]') 
+        
+            start_year  = start_time_np.astype("datetime64[Y]").astype(int) + 1970
+            start_month = start_time_np.astype("datetime64[M]").astype(int) % 12 + 1
+            start_day   = (start_time_np.astype("datetime64[D]") - start_time_np.astype("datetime64[M]")).astype(int) + 1
+            
+
+            # Loop through the forecast horizon to get the month for each forecast step
+            for step in range(FORECAST_HORIZON):
+
+                # The forecast date is the start date plus the forecast step (in months)
+                # Use the month-precision date object for addition
+                forecast_date_np = start_time_month_np + np.timedelta64(step, 'M') 
+                forecast_date_str = str(forecast_date_np).split('T')[0] # Get 'YYYY-MM-DD'
+                
+                # NOTE: start_month is a NumPy scalar, ensure it's converted to a Python int if used outside NumPy math
+                forecast_month = (start_month.item() + step - 1) % 12 + 1
+                forecast_step = step + 1
+                
+                # Select the squared errors for this specific sample and forecast step
+                mse_error_step = mse_error_batch[i, step, :, :].cpu().numpy()
+                
+                # --- Calculate RMSE for this single prediction ---
+                # RMSE for this sample/step is the sqrt of the mean of all cell-wise squared errors
+                current_rmse = np.sqrt(np.mean(mse_error_step))
+                
+                # --- Store the RMSE and metadata in the list ---
+                worst_rmse_list.append({
+                    'rmse': current_rmse,
+                    'date': forecast_date_str,
+                    'step': forecast_step
+                })
+
+                # Select the data for this specific sample and forecast step
+                predicted_step = predicted_y_patches[i, step, :, :].cpu().numpy()
+                actual_step = sample_y[i, step, :, :].cpu().numpy()
+                # abs_error_step = abs_error_batch[i, step, :, :].cpu().numpy()
+
+                # Collect flattened arrays for overall JSD calculation
+                all_predicted_values.append(predicted_step.flatten())
+                all_actual_values.append(actual_step.flatten())
+
+                # Create a unique key for the dictionary
+                data_key = (forecast_month, forecast_step)
+    
+                # Initialize a list if the key doesn't exist
+                if data_key not in monthly_step_mse_data:
+                    monthly_step_mse_data[data_key] = []
+
+                # Append the flattened errors
+                monthly_step_mse_data[data_key].extend(mse_error_step.flatten())
+
+                # Append the flattened errors to the list for the current forecast step
+                # Note: The forecast step is `step + 1` since `step` starts from 0.
+                mse_per_step[step + 1].extend(mse_error_step.flatten())
+                
+                # # Flatten the data for this step and store it with the month
+                # all_abs_errors_with_month.append({
+                #     'month': forecast_month,
+                #     'errors': abs_error_step.flatten()
+                # })
+                # all_predicted_values_with_month.append({
+                #     'month': forecast_month,
+                #     'values': predicted_step.flatten()
+                # })
+                # all_actual_values_with_month.append({
+                #     'month': forecast_month,
+                #     'values': actual_step.flatten()
+                # })
+    
+                # Flatten the squared errors for this step and store it with the month
+                all_mse_errors_with_month.append({
+                    'month': forecast_month,
+                    'errors': mse_error_step.flatten()
+                })
+
+    ###########
+    #   SIC   #
+    ###########
+
+    # --- Group errors by month ---
+    monthly_mse = {month: [] for month in range(1, 13)}
+    for item in all_mse_errors_with_month:
+        monthly_mse[item['month']].extend(item['errors'])
+    
+    # --- Calculate and Plot Monthly Degradation (RMSE) ---
+    monthly_rmse = {month: np.sqrt(np.mean(errors)) for month, errors in monthly_mse.items() if errors}
+    months = sorted(monthly_rmse.keys())
+    rmse_values = [monthly_rmse[m] for m in months]
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.barplot(x=months, y=rmse_values, ax=ax, palette="rocket")
+    ax.set_title(f"{model_version} \n Root Mean Squared Error by Forecasted Month")
+    ax.set_xlabel("Month")
+    ax.set_ylabel("RMSE")
+    plt.tight_layout()
+    plt.savefig(f"{model_version}_monthly_RMSE.png")
+    plt.close()
+    print(f"Monthly RMSE plot saved as {model_version}_monthly_RMSE.png")
+    
+    ## Temporal Degradation Plot (RMSE vs. Forecast Horizon)
+    
+    print("\n--- Calculating Temporal Degradation Metrics ---")
+    
+    # Calculate the RMSE for each forecast step by taking the mean of all squared errors
+    rmse_per_step = []
+    forecast_steps = sorted(mse_per_step.keys())
+    
+    for step in forecast_steps:
+        if mse_per_step[step]:
+            avg_mse = np.mean(mse_per_step[step])
+            rmse_per_step.append(np.sqrt(avg_mse))
+        else:
+            rmse_per_step.append(np.nan) # Handle cases with no data
+
+    # --- Save the plot data ---
+    plot_data = {
+        'forecast_steps': forecast_steps,
+        'rmse_per_step': rmse_per_step
+    }
+    np.save(f'{model_version}_temporal_degradation_data.npy', plot_data)
+    
+    # --- Plot Degradation Curve (RMSE vs. Forecast Step) ---
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    ax.set_xlabel('Forecast Horizon (Months)')
+    ax.set_ylabel('RMSE')
+    ax.plot(forecast_steps, rmse_per_step, color='tab:blue', marker='o', linestyle='-', label='RMSE')
+    ax.tick_params(axis='y', labelcolor='tab:blue')
+    ax.set_xticks(forecast_steps)
+    ax.grid(True, linestyle='--', alpha=0.6)
+    
+    ax.set_title(f'{model_version} \n SIC Temporal Degradation Per Month')
+    ax.legend(loc="upper right")
+    plt.tight_layout()
+    plt.savefig(f'{model_version}_SIC_temporal_degradation.png')
+    plt.close()
+    
+    print(f"Plot saved: {model_version}_SIC_temporal_degradation.png")
+    print(f"Elapsed time for full evaluation: {time.perf_counter() - start_full_evaluation} seconds")
+
+    # --- Calculate average RMSE for each month and forecast step ---
+    avg_monthly_rmse = {}
+    for key, mse_values in monthly_step_mse_data.items():
+        if mse_values:
+            avg_mse = np.mean(mse_values)
+            avg_monthly_rmse[key] = np.sqrt(avg_mse)
+    
+    # --- Prepare data for heatmap ---
+    all_months = sorted(list(set(k[0] for k in avg_monthly_rmse.keys())))
+    all_forecast_steps = sorted(list(set(k[1] for k in avg_monthly_rmse.keys())))
+    
+    # Create a 2D array for the heatmap
+    heatmap_data = np.zeros((len(all_months), len(all_forecast_steps)))
+    
+    for (month, step), rmse in avg_monthly_rmse.items():
+        row_idx = all_months.index(month)
+        col_idx = all_forecast_steps.index(step)
+        heatmap_data[row_idx, col_idx] = rmse
+    
+    # --- Plot the heatmap with the color bar/legend ---
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # The cbar_kws argument adds the color bar to the side of the plot and sets its label.
+    sns.heatmap(
+        heatmap_data, 
+        cmap='viridis', # Choose a suitable colormap
+        ax=ax, 
+        xticklabels=all_forecast_steps, 
+        yticklabels=all_months,
+        cbar_kws={'label': 'Root Mean Squared Error (RMSE)'} # The key addition for the label
+    )
+    
+    ax.set_title(f"RMSE Degradation by Month and Forecast Horizon")
+    ax.set_xlabel("Forecast Horizon (Months)")
+    ax.set_ylabel("Month")
+    
+    # Set the y-axis labels to use month names for better readability
+    month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    ax.set_yticklabels([month_names[m-1] for m in all_months], rotation=0)
+
+    plt.tight_layout()
+    plt.savefig(f"{model_version}_heatmap_RMSE_degradation.png")
+    plt.close()
+    print(f"Monthly and step RMSE degradation heatmap saved.")
+
+    # WORST RSME SCORES
+    sorted_worst_rmse = sorted(worst_rmse_list, key=lambda x: x['rmse'], reverse=True)
+    
+    # Select the top N worst dates
+    TOP_N = 30
+    top_worst_dates = sorted_worst_rmse[:TOP_N]
+    
+    print("\n" + "="*50)
+    print(f"       TOP {TOP_N} WORST RMSE DATES AND FORECAST STEPS")
+    print("="*50)
+    print(f"{'RMSE':<10} {'Date':<15} {'Forecast Step':<15}")
+    print("-" * 40)
+    for entry in top_worst_dates:
+        print(f"{entry['rmse']:.4f}   {entry['date']:<15} {entry['step']:<15}")
+    print("="*50)
+
+    # --- JENSEN-SHANNON DIFFERENCE (JSD) CALCULATION ---
+    
+    print("\n--- Calculating Overall Distribution Metrics (JSD) ---")
+    
+    # Concatenate all predicted and actual arrays into two massive 1D arrays
+    final_predicted_flat = np.concatenate(all_predicted_values)
+    final_actual_flat = np.concatenate(all_actual_values)
+    
+    plot_actual_vs_predicted_sic_distribution(
+        predicted_flat=final_predicted_flat,
+        actual_flat=final_actual_flat,
+        model_version=model_version,
+        patching_strategy_abbr=patching_strategy_abbr,
+        title_suffix=" (Overall Distribution)"
+    )
+
+    ###########
+    #   SIE   #
+    ###########
+
+    # # --- Group SIE data by month and plot ---
+    # monthly_sie_data = {month: {'predicted': [], 'actual': []} for month in range(1, 13)}
+    # for i in range(len(all_predicted_values_with_month)):
+    #     month = all_predicted_values_with_month[i]['month']
+    #     monthly_sie_data[month]['predicted'].extend(all_predicted_values_with_month[i]['values'])
+    #     monthly_sie_data[month]['actual'].extend(all_actual_values_with_month[i]['values'])
+    
+    # # --- Loop through months to generate per-month SIE metrics ---
+    # for month, data in monthly_sie_data.items():
+    #     if not data['actual']:
+    #         continue
+        
+    #     # Convert to NumPy arrays for calculation
+    #     actual_values = np.array(data['actual'])
+    #     predicted_values = np.array(data['predicted'])
+    
+    #     # Apply threshold for SIE
+    #     sie_actual = (actual_values > 0.15).astype(int)
+    #     sie_predicted = (predicted_values > 0.15).astype(int)
+    
+    #     # Print Classification Report
+    #     print(f"\n--- SIE Classification Report for Month {month} ---")
+    #     print(classification_report(sie_actual, sie_predicted, target_names=['No Ice', 'Ice'], zero_division=0))
+    
+    #     # Plot Confusion Matrix
+    #     cm = confusion_matrix(sie_actual, sie_predicted)
+    #     plt.figure(figsize=(8, 6))
+    #     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['No Ice', 'Ice'], yticklabels=['No Ice', 'Ice'])
+    #     plt.title(f'Confusion Matrix - Month {month}')
+    #     plt.xlabel('Predicted Label')
+    #     plt.ylabel('True Label')
+    #     plt.savefig(f"{model_version}_cmatrix_{month}.png")
+    #     plt.close()
+
+
 # # Make a Single Prediction
 
 # In[29]:
 
 
-if EVALUATING_ON:
+
     if MAP_WITH_CARTOPY_ON:
         # Load one batch
         data_iter = iter(test_loader)
