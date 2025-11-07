@@ -92,9 +92,9 @@ PATCHIFY_ABBREVIATIONS = {
 MONTHLY =                      True
 TRIAL_RUN =                    False   # SET THIS TO USE THE PRACTICE SET (MUCH FASTER AND SMALLER, for debugging)
 NORMALIZE_ON =                 False   # SET THIS TO USE NORMALIZATION ON FREEBOARD (Results are independent of patchify used)
-TRAINING =                     False    # SET THIS TO RUN THE TRAINING LOOP (Use on full dataset for results)
+TRAINING =                     True    # SET THIS TO RUN THE TRAINING LOOP (Use on full dataset for results)
 FAST_EVAL_ON =                 False    # SET THIS TO RUN THE METRICS AT THE BOTTOM (Use on full dataset for results)
-SLOW_EVAL_ON =                 True
+SLOW_EVAL_ON =                 False
 MAP_WITH_CARTOPY_ON =          False   # Make sure the Cartopy library is included in the kernel
 
 # Only run ONCE for daily and once for monthly!!
@@ -131,7 +131,7 @@ CELLS_PER_PATCH = 256            # L: Number of cells within each patch (based o
 
 # SLURM - CONVERT THIS TO A .PY FILE FIRST
 PATCHIFY_TO_USE = os.environ.get("SLURM_PATCHIFY_TO_USE", "rows") # for SLURM
-FORECAST_HORIZON = int(os.environ.get("SLURM_FORECAST_HORIZON", 7)) # for SLURM
+FORECAST_HORIZON = int(os.environ.get("SLURM_FORECAST_HORIZON", 12)) # for SLURM
 
 
 # ## Other Variables Dependent on Those Above ^

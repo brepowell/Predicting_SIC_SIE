@@ -93,15 +93,15 @@ PATCHIFY_ABBREVIATIONS = {
 MONTHLY =                      True
 TRIAL_RUN =                    False   # SET THIS TO USE THE PRACTICE SET (MUCH FASTER AND SMALLER, for debugging)
 NORMALIZE_ON =                 False   # SET THIS TO USE NORMALIZATION ON FREEBOARD (Results are independent of patchify used)
-TRAINING =                     False    # SET THIS TO RUN THE TRAINING LOOP (Use on full dataset for results)
+TRAINING =                     True    # SET THIS TO RUN THE TRAINING LOOP (Use on full dataset for results)
 FAST_EVAL_ON =                 False    # SET THIS TO RUN THE METRICS AT THE BOTTOM (Use on full dataset for results)
-SLOW_EVAL_ON =                 True
+SLOW_EVAL_ON =                 False
 MAP_WITH_CARTOPY_ON =          False   # Make sure the Cartopy library is included in the kernel
 
 # Only run ONCE for daily and once for monthly!!
 # Run Settings (already performed, not needed now - KEEP FALSE!!!)
 PLOT_DATA_SPLIT_DISTRIBUTION = False   # Run the data split function to see the train, val, test distribution
-MAX_FREEBOARD_ON =            False   # To normalize with a pre-defined maximum for outlier handling
+MAX_FREEBOARD_ON =             False   # To normalize with a pre-defined maximum for outlier handling
 
 # --- Time-Related Variables:
 CONTEXT_LENGTH = 12           # T: Number of historical time steps used for input

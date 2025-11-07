@@ -1,9 +1,15 @@
-# ACCELERATED ENVIRONMENT - HAVEN'T TRIED IT WITH THE CUDA-TOOLKIT CHANGE - TRY AGAIN LATER
-
 # IMPORTANT: IF YOU HAVE TO MAKE AN EDIT TO THE ENVIRONMENT, THEN IT'S BEST TO TOTALLY REMOVE THE ENVIRONMENT FIRST
 # OTHERWISE, IT DOES AN ENVIRONMENT SOLVE, WHICH INVOLVES DOWNLOADING NEW PACKAGE LISTS
-# LONG STORY SHORT, NEVER USE UNINSTALL
+# LONG STORY SHORT, ***NEVER USE UNINSTALL***
 
+# --- STEPS TO UPDATE: ---
+# conda env remove --prefix /pscratch/sd/b/brelypo/conda_env/sic_sie_env
+# conda clean -a
+# conda env create --prefix /pscratch/sd/b/brelypo/conda_env/sic_sie_env -f environment.yml
+# conda activate /pscratch/sd/b/brelypo/conda_env/sic_sie_env
+# conda list
+
+# ACCELERATED ENVIRONMENT - HAVEN'T TRIED IT WITH THE CUDA-TOOLKIT CHANGE - TRY AGAIN LATER
 # name: rapids_pytorch_xarray_cartopy_papermill
 # channels:
 #   - rapidsai
@@ -67,7 +73,4 @@ dependencies:
   - dask
   - ipykernel
   - cartopy           # Added
-  - papermill         # Added
   - zarr 
-
-
