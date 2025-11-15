@@ -1,0 +1,32 @@
+
+Starting evaluation and metric calculation...
+==================
+DEBUG: Batch Size: 16
+DEBUG: Context Length: 12
+DEBUG: Forecast Horizon: 3
+DEBUG: Number of batches in test_loader (with drop_last=True): 3 Batches
+==================
+DEBUG: len(test_set): 58 Days
+DEBUG: len(dataset) for splitting: 2086 Days
+DEBUG: train_end: 1955
+DEBUG: val_end: 2027
+DEBUG: range for test_set: range(2027, 2058)
+==================
+Processing batch 1/3
+Processing batch 2/3
+Processing batch 3/3
+
+--- Error Metrics (Averaged per Cell per Patch) ---
+Mean Absolute Error (shape torch.Size([210, 256])):
+Overall Mean Absolute Error:            0.1264
+
+Mean Squared Error (shape torch.Size([210, 256])):
+Overall Mean Squared Error:             0.0526
+Overall Root Mean Squared Error (RMSE): 0.22934406451297146
+
+Total predicted values collected: 7741440
+Total actual values collected: 7741440
+
+Jensen-Shannon Distance between actual and predicted histograms: 0.3747
+
+Evaluation complete.

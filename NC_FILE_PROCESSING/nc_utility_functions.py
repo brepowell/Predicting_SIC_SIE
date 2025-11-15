@@ -70,8 +70,8 @@ def load_mesh(path_to_nc_file, mesh_file_name="", print_read_statement=True):
 
     full_path = validate_path(path_to_nc_file, mesh_file_name)
         
-    if print_read_statement:
-        print('======= Read Mesh: ', full_path)
+    # if print_read_statement:
+    #     print('======= Read Mesh: ', mesh_file_name)
 
     dataset = netCDF4.Dataset(full_path)
     latCell = np.degrees(dataset.variables['latCell'][:]) 
@@ -87,8 +87,8 @@ def load_mesh_radians(path, print_read_statement=True):
 
     full_path = validate_path(path)
         
-    if print_read_statement:
-        print('======= Read Mesh: ', full_path)
+    # if print_read_statement:
+    #     print('======= Read Mesh: ', full_path)
 
     dataset = netCDF4.Dataset(full_path)
     latCell = dataset.variables['latCell'][:]

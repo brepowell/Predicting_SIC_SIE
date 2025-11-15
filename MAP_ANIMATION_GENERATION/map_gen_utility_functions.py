@@ -134,6 +134,8 @@ def _map_hemisphere_north(latCell, lonCell, variableToPlot1D, title, hemisphereM
     indices = np.where(latCell > LAT_LIMIT)     # Only capture points between the lat limit and the pole.
     
     norm=mpl.colors.Normalize(VMIN, VMAX)
+    print("VMAX is ", VMAX)
+    
     sc = hemisphereMap.scatter(lonCell[indices], latCell[indices], 
                                c=variableToPlot1D[indices], cmap='bwr', 
                                s=dot_size, transform=ccrs.PlateCarree(),
