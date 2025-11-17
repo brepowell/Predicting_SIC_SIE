@@ -62,9 +62,9 @@ DOT_SIZE        = 0.4  # Good for the ice area variable
 DEFAULT_DOWNSAMPLE_FACTOR = 100
 
 # Color Bar Range
-VMIN = 0
+VMIN = 0.15
 #VMAX = 1      # Good for Ice Area
-VMAX = 0.25     # RSME
+VMAX = 0.3     # RSME
 #VMAX = 0.7    # Good for Freeboard
 #VMAX = 8       # outlier
 #VMAX = 150    # samplemf for ALL FILES - the max is 295, but there are not many cells that go above 150 samples; 100 is too low
