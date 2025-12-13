@@ -86,6 +86,24 @@ def generate_axes_north_and_south_pole():
     southMap = fig.add_subplot(1, 2, 2, projection=map_projection_south)
 
     return fig, northMap, southMap
+
+def generate_axes_north_three_subplots():
+    """ 
+    Return a figure and axes (maps) for plotting 
+    North Actual, North Predicted, and North Difference.
+    """
+    # 3 subplots side-by-side: using [15, 5] for good width
+    fig = plt.figure(figsize=[15, 5]) 
+    
+    # Define the projection for all three maps
+    map_projection_north = ccrs.NorthPolarStereo(central_longitude=270, globe=None)
+
+    north_actual_ax = fig.add_subplot(1, 3, 1, projection=map_projection_north)
+    north_predicted_ax = fig.add_subplot(1, 3, 2, projection=map_projection_north)
+    north_difference_ax = fig.add_subplot(1, 3, 3, projection=map_projection_north)
+    
+    return fig, north_actual_ax, north_predicted_ax, north_difference_ax
+
     
 def generate_axes_all_projections():
     """Return a figure and six axes with different projections in a 3x2 layout."""
@@ -125,7 +143,7 @@ def generate_axes_all_projections():
     return fig, [ax1, ax2, ax3, ax4, ax5, ax6]
 
 
-def _map_hemisphere_north(latCell, lonCell, variableToPlot1D, title, hemisphereMap, dot_size=DOT_SIZE):
+def _map_hemisphere_north(latCell, lonCell, variableToPlot1D, title, hemisphereMap, dot_size=DOT_SIZE, title_font_size=SUBPLOT_FONT_SIZE):
     """ Helper Function: Map the northern hemisphere onto a matplotlib figure. 
     This requires latCell and lonCell to be filled by a mesh file.
     It also requires variableToPlot1D to be filled by an output .nc file. 
@@ -140,7 +158,7 @@ def _map_hemisphere_north(latCell, lonCell, variableToPlot1D, title, hemisphereM
                                c=variableToPlot1D[indices], cmap='bwr', 
                                s=dot_size, transform=ccrs.PlateCarree(),
                                norm=norm)
-    hemisphereMap.set_title(title)
+    hemisphereMap.set_title(title, fontsize=title_font_size)
     hemisphereMap.axis('off')
 
     return sc
@@ -723,6 +741,68 @@ def generate_map_north_pole(fig, northMap, latCell, lonCell, variableToPlot1D, m
     plt.close(fig)
 
     return scatter
+
+def generate_maps_actual_predicted_difference(fig, actualMap, predictedMap, differenceMap,
+                                              actualValues, predictedValues, differenceValues, 
+                                              latCell, lonCell, mapImageFileName, 
+                                              colorBarOn=COLORBARON, grid=GRIDON,
+                                              oceanFeature=OCEANFEATURE, landFeature=LANDFEATURE,
+                                              coastlines=COASTLINES, dot_size=DOT_SIZE, 
+                                              textBoxString="", suptitle_year = False):
+    
+    """ Generate 3 maps: one actual values, one predicted values, and one of the difference. """
+
+    # Adjust the margins around the plots (as a fraction of the width or height).
+    fig.subplots_adjust(bottom=0.05, top=0.85, left=0.04, right=0.95, wspace=0.02)
+
+    # Set your viewpoint (the bounding box for what you will see).
+    # You want to see the full range of longitude values, since this is a polar plot.
+    # The range for the latitudes should be from your latitude limit (i.e. 50 degrees or -50 to the pole at 90 or -90).
+    
+    actualMap.set_extent([MINLONGITUDE, MAXLONGITUDE,  LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
+    predictedMap.set_extent([MINLONGITUDE, MAXLONGITUDE, LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
+    differenceMap.set_extent([MINLONGITUDE, MAXLONGITUDE, LAT_LIMIT, NORTHPOLE], ccrs.PlateCarree())
+
+    # Add map features, like landFeature and oceanFeature.
+    add_map_features(actualMap, oceanFeature, landFeature, grid, coastlines)
+    add_map_features(predictedMap, oceanFeature, landFeature, grid, coastlines)
+    add_map_features(differenceMap, oceanFeature, landFeature, grid, coastlines)
+
+    # Crop the map to be round instead of rectangular.
+    actualMap.set_boundary(make_circle(), transform=actualMap.transAxes)
+    predictedMap.set_boundary(make_circle(), transform=predictedMap.transAxes)
+    differenceMap.set_boundary(make_circle(), transform=differenceMap.transAxes)
+
+    # Map the 2 hemispheres.
+    actualScatter = _map_hemisphere_north(latCell, lonCell, actualValues, "Actual SIC", actualMap, dot_size=dot_size)
+    predictedScatter = _map_hemisphere_north(latCell, lonCell, predictedValues, "Prediction", predictedMap, dot_size=dot_size)
+    differenceScatter = _map_hemisphere_north(latCell, lonCell, differenceValues, "Absolute Difference", differenceMap, dot_size=dot_size)
+
+    # Add the timestamp to the North Map on the left side
+    if textBoxString != "":    
+        textBox = actualMap.text(0.05, 0.95, textBoxString, transform=actualMap.transAxes, fontsize=14,
+            verticalalignment='top', bbox=boxStyling, zorder=5)
+
+    # Set Color Bar - make sure this is the last thing you add to the map!
+    if colorBarOn:
+        plt.colorbar(actualScatter, ax=actualMap)
+        plt.colorbar(predictedScatter, ax=predictedMap)
+        plt.colorbar(differenceScatter, ax=differenceMap)
+
+    # Add the bold title at the top
+    if suptitle_year:
+        # Title it with the year of the data
+        plt.suptitle(suptitle_variable_year(), size="x-large", fontweight="bold")
+    else:
+        # Title it with the plot name
+        plt.suptitle(mapImageFileName, size="x-large", fontweight="bold")
+
+    # Save the map as an image
+    plt.savefig(mapImageFileName)
+    plt.close(fig)
+
+    return actualScatter, predictedScatter, differenceScatter
+
 
 def generate_static_map_png_file_name(file_path, day=1):    
     """Generate a PNG file name based on the .nc file name and a given day.
